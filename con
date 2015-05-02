@@ -1,0 +1,12 @@
+#!/bin/bash
+set -x 
+
+stty -F /dev/ttyUSB0 9600 cs8 -parenb -cstopb || exit 1
+sleep 1
+stty eof undef || exit 1
+sleep 1
+cat < /dev/ttyUSB0 &
+sleep 1
+cat > /dev/ttyUSB0
+
+
