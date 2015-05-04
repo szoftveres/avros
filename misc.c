@@ -7,19 +7,6 @@
 #include "pm.h"
 
 
-void
-mfputc (int fd, int data) {
-    if (writec(fd, data) == EOF) {
-        mexit(0); /* Behaves like SIGPIPE */
-    } 
-    return;
-}
-
-/*
- *
- */
-
-
 int
 mgetc (void) {
     return (readc(0));
@@ -30,16 +17,20 @@ mgetc (void) {
  */
 
 void
+mfputc (int fd, int data) {
+    if (writec(fd, data) == EOF) {
+        mexit(0); /* Behaves like SIGPIPE */
+    } 
+    return;
+}
+
+void
 mfputu (int fd, unsigned int num) {
     if(num/10){
         mfputu(fd, num/10);
     }
     return (mfputc(fd, (num%10) + '0'));
 }
-
-/*
- *
- */
 
 static void
 mfputx_internal (int fd, unsigned int num) {
@@ -52,7 +43,8 @@ mfputx_internal (int fd, unsigned int num) {
 
 void
 mfputx (int fd, unsigned int num) {
-   mfprintf(fd, "0x");
+   mfputc(fd, '0');
+   mfputc(fd, 'x');
    mfputx_internal(fd, num);
    return;
 }
@@ -61,42 +53,39 @@ mfputx (int fd, unsigned int num) {
 void mfprintf (int fd, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    while (*fmt) {
-        if (*fmt == '%') {
-            int i;
-            fmt++;
-            switch (*fmt) {
-              case 'c':
-                mfputc(fd, (char)va_arg(ap, int));
-                break;
-              case 's': {
-                    char* s = va_arg(ap, char*);
-                    while (*s) {
-                        mfputc(fd, *s++);
-                    }
-                }
-                break;
-              case 'x':
-              case 'X':
-                i = va_arg(ap, int);
-                mfputx(fd, i);
-                break;
-              case 'd':
-              case 'i':
-                i = va_arg(ap, int);
-                mfputu(fd, i);
-                break;
-            }
-        } else {
+    for (;*fmt; fmt++) {
+        if (*fmt != '%') {
             mfputc(fd, *fmt);
+            continue;
         }
         fmt++;
+        switch (*fmt) {
+          case 'c':
+            mfputc(fd, (char)va_arg(ap, int));
+            break;
+          case 's': {
+                char* s = va_arg(ap, char*);
+                while (*s) {
+                    mfputc(fd, *s++);
+                }
+            }
+            break;
+          case 'x':
+          case 'X':
+            mfputx(fd, va_arg(ap, int));
+            break;
+          case 'd':
+          case 'i':
+            mfputu(fd, va_arg(ap, int));
+            break;
+        }
     }
     va_end(ap);
 }
 
-
-
+/*
+=============
+*/
 
 
 getopt_p
@@ -132,7 +121,7 @@ getopt (char* argv[], char* opts, getopt_p opt_p) {
     }
 	c = argv[opt_p->optind][opt_p->sp];
 	if ((c == ':') || ((cp=strchr(opts, c)) == NULL)) {
-        mfprintf(2, "%s: opt %c?\n", argv[0], c);
+        mfprintf(2, "%s: -%c?\n", argv[0], c);
 		if (argv[opt_p->optind][++opt_p->sp] == '\0') {
 			opt_p->optind++;
 			opt_p->sp = 1;
@@ -143,7 +132,7 @@ getopt (char* argv[], char* opts, getopt_p opt_p) {
 		if (argv[opt_p->optind][opt_p->sp+1] != '\0') {
 			opt_p->optarg = &argv[opt_p->optind++][opt_p->sp+1];
         } else if (++opt_p->optind >= argc(argv)) {
-		    mfprintf(2, "%s: opt needs arg: %c\n", argv[0], c);
+		    mfprintf(2, "%s: -%c needs arg\n", argv[0], c);
 			opt_p->sp = 1;
 			return ('?');
 		} else {

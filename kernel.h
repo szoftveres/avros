@@ -35,7 +35,7 @@ typedef struct task_s* pid_t;
 #define TASK_ANY    ((pid_t)(0xFFFF))
 
 /* DEFAULT STACK SIZE */
-#define DEFAULT_STACK_SIZE  ((size_t)(192))
+#define DEFAULT_STACK_SIZE  ((size_t)(128))
 
 /*
  *
@@ -82,6 +82,7 @@ void kirqen(void);
 void kirqdis(void);
 
 void launchtask(pid_t pid, void(*ptsk)(void), size_t stacksize);
+
 
 /*
  *

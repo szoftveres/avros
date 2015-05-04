@@ -4,10 +4,10 @@
 #include <avr/io.h>
 #include "queue.h"
 
-
 /*
 ================================================================================
  */
+
 
 void usart0_wr (int data) {
     while(!(UCSR0A & (1<<UDRE0))) yield();
@@ -99,7 +99,7 @@ void usart0 (void) {
                 if(msg.param.interrupt.data == 0x04){ /* Ctrl + D */
                     msg.param.interrupt.data = EOF;
                 }else{ 
-                //    usart0_wr(msg.param.interrupt.data); /* ECHO */
+                    usart0_wr(msg.param.interrupt.data); /* ECHO */
                 }
                 elem = (msgq_t*)(Q_FIRST(rd_q));
                 if (elem && elem->msg.cmd == DM_READC) {
@@ -169,6 +169,48 @@ void devnull (void) {
                 msg.cmd = DM_READC_ANS;    
                 msg.param.rwc.data = EOF; 
                 break;
+        }
+        send(client, &msg);
+    }
+}
+
+/*
+================================================================================
+ */
+
+void memfile (void) {
+    pid_t client;
+    dmmsg_t msg;  
+    char*   file;
+
+    while (1) {
+        client = receive(TASK_ANY, &msg, sizeof(msg));
+        switch(msg.cmd){
+          case DM_MKDEV:
+            file = (char*)kmalloc(128);
+            msg.cmd = DM_MKDEV_ANS;
+            break;
+
+          case DM_INTERRUPT:
+            msg.cmd = DM_DONTREPLY;
+            break;
+
+          case DM_WRITEC:
+            if (msg.param.rwc.pos > 127) {
+                msg.param.rwc.data = EOF;
+            } else {
+                file[msg.param.rwc.pos] = (char) msg.param.rwc.data;
+            }
+            msg.cmd = DM_WRITEC_ANS;
+            break;
+          case DM_READC:
+            if (msg.param.rwc.pos > 127) {
+                msg.param.rwc.data = EOF;
+            } else {     
+                msg.param.rwc.data = file[msg.param.rwc.pos];
+            }
+            msg.cmd = DM_READC_ANS;
+            break;
         }
         send(client, &msg);
     }

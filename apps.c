@@ -62,14 +62,31 @@ login (char** argv) {
 ================================================================================
 */
 
+#define ECHO_N    0x01
+
 int
 echo (char** argv) {
     int i;
-    for (i=1; argv[i]; i++) {
+    int c;
+    int o = 0;
+    getopt_p opt_p = initgetopt();
+
+    while ((c = getopt(argv, "n", opt_p)) != EOF) {
+        switch (c) {
+          case 'n': o |= ECHO_N; break;
+          case '?': pmfree(opt_p); mexit(1); break;
+        }
+    }
+    i = opt_p->optind;
+    pmfree(opt_p);
+
+    for (; argv[i]; i++) {
         mfprintf(1, argv[i]);
         mfputc(1, ' ');
     }
-    mfputc(1, '\n');
+    if (!(o & ECHO_N)) {
+        mfputc(1, '\n');
+    }
     return (0);
 }
 
@@ -104,57 +121,6 @@ cat (char** argv) {
     return (0);
 }
 
-/*
-================================================================================
-*/
-#define WC_CHAR 0x01
-#define WC_LINE 0x02
-#define WC_WORD 0x04
-
-int
-wc (char** argv) {
-    int c, opt = 0, byte =0, word =0, line =0;
-    char sep = 1;
-    getopt_p opt_p = initgetopt();
-
-    while ((c = getopt(argv, "clw", opt_p)) != EOF) {
-        switch (c) {
-          case 'c': opt |= WC_CHAR; break;
-          case 'l': opt |= WC_LINE; break;
-          case 'w': opt |= WC_WORD; break;
-          case '?': pmfree(opt_p); mexit(1); break;
-        }
-    }
-    pmfree(opt_p);
-    if (!opt) {
-        opt |= (WC_CHAR | WC_LINE | WC_WORD);
-    }
-    
-    while ((c = mgetc()) != EOF) {
-        byte++;
-        switch(c){
-          case '\r':
-          case '\n': line++;
-          case ' ': 
-          case '\t': if(!sep) word++; sep = 1; break;
-          default: sep = 0; break;
-        }
-    }
-
-    if (!sep && byte) word++;
-    
-    if (opt & WC_CHAR) {
-        mfprintf(1, "\t%d", byte);
-    }
-    if (opt & WC_WORD) {
-        mfprintf(1, "\t%d", word);
-    }
-    if (opt & WC_LINE) {
-        mfprintf(1, "\t%d", line);
-    }
-    mfputc(1, '\n');
-    return (0);
-}
 
 /*
 ================================================================================
@@ -246,6 +212,34 @@ at (char** argv) {
     return (0);
 }
 
+
+/*
+================================================================================
+*/
+
+int
+do_repeat (char** argv) {
+    execv(argv[2], &(argv[2]));
+    unknown(argv, argv[2]);
+    return (-1);
+}
+
+int
+repeat (char** argv) {
+    int n;
+    int i;
+    if (argc(argv) < 3) {
+        noargs(argv);
+        return (-1);
+    }
+    n = atoi(argv[1]);
+    for (i = 0; i != n; i++) {
+        spawntask(do_repeat, DEFAULT_STACK_SIZE, argv);
+        wait(NULL);
+    }
+    return (0);
+}
+
 /*
 ================================================================================
 */
@@ -291,7 +285,11 @@ f_stat (char** argv) {
             unknown(argv, argv[i]);
             return (-1);
         }
-        mfprintf(1, "%s:\n ino:%x\n dev:%x\n", argv[i], st.ino, st.dev);
+        mfprintf(1, "%s:\n ino:%x\n dev:%x\n size:%d\n mode:%d\n", argv[i],
+                 st.ino,
+                 st.dev,
+                 st.size,
+                 st.mode);
     }
     return (0);
 }
@@ -369,8 +367,4 @@ grep (char** argv) {
     return (c);
 }
 
-
-/*
-================================================================================
-*/
 

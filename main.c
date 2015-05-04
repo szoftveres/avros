@@ -33,14 +33,15 @@ void start (void) {
 
     /* starting device manager server */
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, dm, DEFAULT_STACK_SIZE+256);
+    launchtask(pid, dm, DEFAULT_STACK_SIZE * 2);
     setdmpid(pid);
 
-    /* setting up devices */
-    mknod(mkdev(devnull), "null");
-    mknod(mkdev(usart0), "usart0");
-    mknod(mkdev(portdevA), "portA");
-    mknod(DEV_FIFO, "npipe");
+    /* setting up devices/files */
+    mknod(mkdev(devnull), "null", S_IFCHR);
+    mknod(mkdev(usart0), "usart0", S_IFCHR);
+    mknod(mkdev(memfile), "mf1", S_IFREG);
+    mknod(mkdev(memfile), "mf2", S_IFREG);
+    mknod(0, "npipe", S_IFIFO);
 
     /* starting executable store server */
     pid = addtask(TASK_PRIO_HIGH);
@@ -52,18 +53,18 @@ void start (void) {
     es_regprg("login",      login,          DEFAULT_STACK_SIZE);
     es_regprg("sh",         sh,             DEFAULT_STACK_SIZE);
     es_regprg("echo",       echo,           DEFAULT_STACK_SIZE);
-    es_regprg("wc",         wc,             DEFAULT_STACK_SIZE);
     es_regprg("cat",        cat,            DEFAULT_STACK_SIZE);
     es_regprg("sleep",      sleep,          DEFAULT_STACK_SIZE);
     es_regprg("xargs",      xargs,          DEFAULT_STACK_SIZE);
     es_regprg("at",         at,             DEFAULT_STACK_SIZE);
+    es_regprg("repeat",     repeat,         DEFAULT_STACK_SIZE);
     es_regprg("uptime",     pr_uptime,      DEFAULT_STACK_SIZE);
     es_regprg("stat",       f_stat,         DEFAULT_STACK_SIZE);
     es_regprg("grep",       grep,           DEFAULT_STACK_SIZE);
 
     /* starting process manager server */
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, pm, DEFAULT_STACK_SIZE+128);
+    launchtask(pid, pm, DEFAULT_STACK_SIZE * 2);
     setpmpid(pid);
 
     /* launching init */

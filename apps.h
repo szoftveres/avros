@@ -11,8 +11,6 @@ int getty(char** argv);
 
 int echo(char** argv);
 
-int wc(char** argv);
-
 int cat(char** argv);
 
 int sleep (char** argv);
@@ -27,5 +25,6 @@ int f_stat (char** argv);
 
 int grep (char** argv);
 
+int repeat (char** argv);
 
 #endif

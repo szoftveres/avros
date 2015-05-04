@@ -6,22 +6,25 @@
  * DEVTAB
  */
 
-#define MAX_DEV         (4) /* u1, u2, null, pipe, eeprom, ramdisk */
+#define MAX_DEV         (6) /* u1, u2, null, pipe, eeprom, ramdisk */
 static pid_t            devtab[MAX_DEV];
 
 /*
- * ITAB
+ * INODE
  */
 
-typedef struct itab_s {
+typedef struct inode_s {
     int                 dev;
     char                refcnt;
     char                links;
+    mode_t              mode;
+    int                 size;
     q_head_t            msgs;
     dmmsg_t             *msg;
-} itab_t;
+} inode_t;
+
 #define MAX_I           (12)
-static itab_t           itab[MAX_I];
+static inode_t          itab[MAX_I];
 
 /*
  * DIRTAB
@@ -40,6 +43,7 @@ static q_head_t         dirtab;
 typedef struct filp_s {
     int                 inode;
     char                refcnt;
+    int                 pos;
 } filp_t;
 
 #define MAX_FILP        (16)
@@ -190,7 +194,7 @@ do_mkdev (dmmsg_t *msg) {
         return;
     }
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, msg->param.mkdev.ask.driver, DEFAULT_STACK_SIZE + 128);
+    launchtask(pid, msg->param.mkdev.ask.driver, DEFAULT_STACK_SIZE);
     devtab[i] = pid;
 
     msg->cmd = DM_MKDEV;
@@ -209,27 +213,29 @@ do_mknod (dmmsg_t *msg) {
     dirtab_t *dirent;
     ino = find_empty_itab();            
     if (ino < 0) {
-        msg->param.mkrmnod.ino = -1;
+        msg->param.mknod.ino = -1;
         return;
     }
     dirent = (dirtab_t*)kmalloc(sizeof(dirtab_t));
     if (!dirent) {
-        msg->param.mkrmnod.ino = -1;
+        msg->param.mknod.ino = -1;
         return;
     }
-    dirent->name = kmalloc(strlen(msg->param.mkrmnod.name)+1);
+    dirent->name = kmalloc(strlen(msg->param.mknod.name)+1);
     if (!dirent->name) {
         kfree(dirent);
-        msg->param.mkrmnod.ino = -1;
+        msg->param.mknod.ino = -1;
         return;
     }
     Q_END(&dirtab, dirent);
-    strcpy(dirent->name, msg->param.mkrmnod.name);
-    itab[ino].dev = msg->param.mkrmnod.id;
+    strcpy(dirent->name, msg->param.mknod.name);
+    itab[ino].dev = msg->param.mknod.id;
+    itab[ino].mode = msg->param.mknod.mode;
+    itab[ino].size = 0;
     itab[ino].links++; /* hard link count */
     q_init(&(itab[ino].msgs));
     dirent->ino = ino;
-    msg->param.mkrmnod.ino = ino;
+    msg->param.mknod.ino = ino;
     return;
 }
 
@@ -245,10 +251,10 @@ do_stat (dmmsg_t *msg) {
         msg->param.stat.ans.code = -1;
         return;
     }
-    if (msg->param.stat.ask.st_stat) {
-        msg->param.stat.ask.st_stat->ino = dirent->ino;
-        msg->param.stat.ask.st_stat->dev = itab[dirent->ino].dev;
-    }
+    msg->param.stat.ans.st_stat.ino = dirent->ino;
+    msg->param.stat.ans.st_stat.dev = itab[dirent->ino].dev;
+    msg->param.stat.ans.st_stat.size = itab[dirent->ino].size;
+    msg->param.stat.ans.st_stat.mode = itab[dirent->ino].mode;
     msg->param.stat.ans.code = 0;
     return;
 }
@@ -267,7 +273,7 @@ do_pipe (dm_task_t *client, dmmsg_t *msg) {
         msg->param.pipe.result = -1;
         return;
     }
-    itab[ino].dev = DEV_FIFO;
+    itab[ino].mode = S_IFIFO;
     itab[ino].msg = NULL;
 
     /* input */
@@ -336,6 +342,7 @@ do_open (dm_task_t *client, dmmsg_t *msg) {
         return;
     }
     client->fd[fd] = fp;
+    filp[fp].pos = 0;
     filp[fp].inode = ino;
     filp[fp].refcnt++;
     itab[ino].refcnt++; 
@@ -365,7 +372,7 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
     if ((--(filp[fp].refcnt))) {
         return; /* refcnt not zero yet */
     }
-    if (itab[ino].dev == DEV_FIFO) {
+    if (itab[ino].mode == S_IFIFO) {
         /* refcnt is zero, send EOF to waiting client */
         if (itab[ino].msg) {
             itab[ino].msg->param.rwc.data = EOF;
@@ -379,7 +386,7 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
         return; /* refcnt || link cnt not zero yet */
     }
 
-    if (itab[ino].dev != DEV_FIFO) {
+    if (itab[ino].mode != S_IFIFO) {
         msg->cmd = DM_RMNOD;
         sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));
     } else {
@@ -397,15 +404,36 @@ do_rw (dm_task_t *client, dmmsg_t *msg) {
     int fd = msg->param.rwc.fd;
     int ino;
     if ((fd < 0) || (client->fd[fd] < 0)) {
-        //msg->param.rwc.data = EOF; /* wrong fd */
+        msg->param.rwc.data = EOF; /* wrong fd */
         return;
     }
     ino = filp[client->fd[fd]].inode;
-    if (itab[ino].dev != DEV_FIFO) {
-        /* Regular driver */
+
+    switch (itab[ino].mode) {
+      case S_IFREG:
+        msg->param.rwc.pos = filp[client->fd[fd]].pos;
+        
+        switch (msg->cmd) {
+          case DM_WRITEC:
+            filp[client->fd[fd]].pos++; /* Assumption: no error during r/w */
+            itab[ino].size = filp[client->fd[fd]].pos;
+            break;
+          case DM_READC:
+            if (filp[client->fd[fd]].pos >= itab[ino].size) {
+                msg->param.rwc.data = EOF; /* reached end of file */
+                return;
+            }
+            filp[client->fd[fd]].pos++; /* Assumption: no error during r/w */
+            break;
+        }
+        sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));        
+        break;
+
+      case S_IFCHR:
         sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));
-    } else {
-        /* FIFO */
+        break;
+
+      case S_IFIFO:
         if (!itab[ino].msg) {
             if (itab[ino].refcnt <= 1) {
                 /* Other end detached, send EOF */
@@ -436,6 +464,7 @@ do_rw (dm_task_t *client, dmmsg_t *msg) {
                 break;
             }
         }
+        break;
     }
     return;
 }
@@ -676,13 +705,14 @@ mkdev (void(*p)(void)) {
  */
 
 int
-mknod (int dev, char* name) {
+mknod (int dev, char* name, mode_t mode) {
     dmmsg_t msg;
     msg.cmd = DM_MKNOD;
-    msg.param.mkrmnod.id = dev;
-    msg.param.mkrmnod.name = name;
+    msg.param.mknod.id = dev;
+    msg.param.mknod.mode = mode;
+    msg.param.mknod.name = name;
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.mkrmnod.ino);
+    return (msg.param.mknod.ino);
 }
 
 
@@ -704,8 +734,8 @@ fstat (char *name, struct stat *st_stat) {
     dmmsg_t msg;
     msg.cmd = DM_STAT;
     msg.param.stat.ask.name = name;
-    msg.param.stat.ask.st_stat = st_stat;
-    sendrec(dmtask, &msg, sizeof(msg));
+    sendrec(dmtask, &msg, sizeof(msg));    
+    memcpy(st_stat, &msg.param.stat.ans.st_stat, sizeof(struct stat));
     return (msg.param.stat.ans.code);
 }
 

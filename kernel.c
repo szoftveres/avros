@@ -228,7 +228,6 @@ enum {
     
 };
 
-
 /*
  *
  */
@@ -306,7 +305,6 @@ k_build_initial_stack (task_t* newtask, void (*tp)(void), size_t stack) {
     ctxt->retLow = LOW(tp);
     ctxt->retHigh = HIGH(tp);
     ctxt->r1 = 0;                                   /* GCC needs r1 to be 0x00 */
-
     return (newtask->sb);
 }
 
@@ -568,6 +566,7 @@ kernel (void(*ptp)(void), size_t stack, unsigned char prio) {
         switch_from_kernel();
         /* kernel entry point */
 		old = CURRENT;
+
 		/* handle event */
         if (eventcode != EVENT_NONE) {
             /* Check whether any task waits for this event */
@@ -657,12 +656,13 @@ kernel (void(*ptp)(void), size_t stack, unsigned char prio) {
 			break;              
 
 		  case KRNL_MALLOC:         /* Allocate memory */
+          
 			CURRENT->krncall.kmalloc.ans.ptr = 
                     malloc(CURRENT->krncall.kmalloc.ask.size);
 			break;            
 
 		  case KRNL_FREE:           /* Free memory */
-			free(CURRENT->krncall.kfree.ptr);   
+			free(CURRENT->krncall.kfree.ptr);
 			break;
 
           case KRNL_GETPID:         /* Get pid */
@@ -706,6 +706,7 @@ kernel (void(*ptp)(void), size_t stack, unsigned char prio) {
 
 		  case KRNL_YIELD:          /* Let other tasks running */
             Q_END(&queue[old->prio], Q_REMV(&current_q, CURRENT));
+
 		  default:
 			break;
 		}
@@ -938,8 +939,4 @@ kirqdis(void) {
     swtrap();
     return;
 }
-
-/*
- *
- */
 

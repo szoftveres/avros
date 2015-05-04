@@ -182,14 +182,24 @@ sh (char** argv) {
     int pip[2];
     int nextin;
 	char *cmdline, *job, *p, *jobstart;
+    char* prompt = "$ ";
     
+    if (argv[1]) {
+        close(0);
+        if (open(argv[1]) < 0) {
+            unknown(argv, argv[1]);
+            return 1;
+        }
+        prompt = "";
+    }
+
     nextin = dup(0); /* 2 = stdin  */
     dup(1); /* 3 = stdout */
     JOB_INIT
 
 
     while (1) {
-        mfprintf(1, "$ "); /* prompt */
+        mfprintf(1, prompt);
 		cmdline = (char*) pmmalloc(MAX_CMDLINE);
         getcmd(cmdline, MAX_CMDLINE);
         
@@ -245,10 +255,10 @@ sh (char** argv) {
         JOB_NOPIPE
 		job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
 		strcpy(job, jobstart);					/* filling with one section */
+		pmfree(cmdline);
         send(spawntask(exec_job, DEFAULT_STACK_SIZE, argv), job);
 		pmfree(job);							/* deleting buffer */
         wait(&code);
-		pmfree(cmdline);
         JOB_INIT
     }
 }
