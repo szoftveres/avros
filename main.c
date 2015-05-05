@@ -12,13 +12,13 @@
 #include "sh.h"
 
 /*
- * The main purpose of this task is to start and set everything in the
- * right order. When INIT is started at last, everything will be up 
- * and running.
- *
+ * The main purpose of this task is to start all the servers and set
+ * up the environment for the operating system.
+ * It starts 'init' at the end, then exits.
  */
 
-void start (void) {
+void
+startup (void) {
     pid_t pid;
 
     /* starting timer server */
@@ -77,11 +77,11 @@ void start (void) {
 }
 
 /*
- *
+ * Main entry point of the kernel. Parameter is the first task
  */
 
 int main (void) {
-    kernel(start, DEFAULT_STACK_SIZE, TASK_PRIO_DFLT);
+    kernel(startup, DEFAULT_STACK_SIZE, TASK_PRIO_DFLT);
     return 0;
 }
 

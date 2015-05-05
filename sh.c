@@ -22,28 +22,18 @@
 #define SOUT        4
 
 
-static int
-exec_job (char** argv) {
+static void
+parse_args (char* t,
+            char** stin,
+            char** stout,
+            char** args) {
     int i;
     int state = CMD_WSPACE;
-    char* cmd = pmmalloc(MAX_JOBLEN);
-    char* stin = NULL;
-    char* stout = NULL;
-    char** args = pmmalloc(sizeof(char*) * (MAX_ARGS + 1));
 
-    /* 
-     * This is mandatory because shell keeps the other
-     * end of the pipe and this process inherits it
-     */
-    for (i = 3; i < MAX_FD; i++) {
-        close(i);
-    }
-
-    char* t = cmd;
     for (i = 0; i < (MAX_ARGS + 1); i++) {
         args[i] = NULL;
-    }   
-    receive(TASK_ANY, cmd, MAX_JOBLEN);           
+    }
+
     i=0;
     while (*t) {
         switch (*t) {
@@ -63,16 +53,42 @@ exec_job (char** argv) {
           default:
             if (state == CMD_WSPACE) {
                 args[i] = t;
-            } else if (state == SIN) {
-                stin = t;
-            } else if (state == SOUT) {
-                stout = t;
+            } else if ((state == SIN) && stin) {
+                *stin = t;
+            } else if ((state == SOUT) && stout) {
+                *stout = t;
             }
             state = CMD_LETTER;
             break;            
         }
         t++;
     }
+    return;
+}
+
+
+
+
+static int
+exec_job (char** argv) {
+    int i;
+    char* cmd;
+    char* stin = NULL;
+    char* stout = NULL;
+    char** args = pmmalloc(sizeof(char*) * (MAX_ARGS + 1));
+
+    /* 
+     * This is mandatory because shell keeps the other
+     * end of the pipe and this process inherits it
+     */
+    for (i = 3; i < MAX_FD; i++) {
+        close(i);
+    }
+
+    cmd = pmmalloc(MAX_JOBLEN);
+    receive(TASK_ANY, cmd, MAX_JOBLEN);  
+
+    parse_args(cmd, &stin, &stout, args);
 
     if (!args[0]) {
         pmfree(cmd);
@@ -106,30 +122,6 @@ exec_job (char** argv) {
     return (-1);
 }
 
-/**
-*/
-
-static void
-getcmd (char* cmd, int len) {
-    int  c;
-    int  i = 0;
-    while (1) {
-        c = mgetc();
-        if (c == EOF) {
-			mfputc(1, '\n');
-			mexit(0);
-		}
-        if (i >= (len-1)) {
-			i--;
-		}
-        if ((c == '\r') || (c == '\n')) {
-			break;
-		}
-        cmd[i++] = c;  
-        i -= (i == len-1) ? 1 : 0;
-    }
-    cmd[i] = '\0';
-}
 
 /**
   This task will launch the exec process and exits immediately
@@ -144,6 +136,89 @@ launch_job (char** argv) {
 	pmfree(cmd);
 	return (0);
 }
+
+/**
+*/
+
+static int
+builtin (char* cmd) {
+    char* line = pmmalloc(MAX_JOBLEN);;
+    char** args = pmmalloc(sizeof(char*) * (MAX_ARGS + 1));
+    int rc = 0;
+
+    strcpy(line, cmd);
+    parse_args(line, NULL, NULL, args);
+    
+    if (!strcmp(args[0], "exit")) {
+        rc = 1;
+        mexit(args[1]?atoi(args[1]):0);
+    }
+
+    if (!strcmp(args[0], "cd")) {
+        rc = 1;
+        if (!args[1]) {
+            noargs(args);
+        } else {
+            mfprintf(1,"cd %s\n", args[1]);
+        }
+    }
+
+
+    pmfree(args);
+    pmfree(line);
+    return (rc);
+}
+
+
+/**
+*/
+
+static int
+getcmd (char* cmd, int len) {
+    int  c;
+    int  i = 0;
+    while (1) {
+        c = mgetc();
+        if (c == EOF) {
+			return c;
+		}
+        if (i >= (len-1)) {
+			i--;
+		}
+        if ((c == '\r') || (c == '\n')) {
+			break;
+		}
+        cmd[i++] = c;  
+        i -= (i == len-1) ? 1 : 0;
+    }
+    cmd[i] = '\0';
+    return 0;
+}
+
+
+
+static int
+execute (char interactive, char direct, char* line, char** argv) {
+    char* job;
+    int code;
+    if (direct) {
+        if (builtin(line)) {
+            return 0;
+        }
+    }
+    job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
+    strcpy(job, line);					/* filling with one section */
+    send(spawntask(direct ? exec_job: launch_job, DEFAULT_STACK_SIZE, argv), job);
+    pmfree(job);							/* deleting buffer */
+    wait(&code);
+    if (direct && interactive) {
+        mfprintf(3, " (%d)\n", code);
+    }
+    return (code);
+}
+
+/**
+*/
 
 #define JOB_INIT                        \
     close(0);                           \
@@ -181,8 +256,8 @@ sh (char** argv) {
     int code;
     int pip[2];
     int nextin;
-	char *cmdline, *job, *p, *jobstart;
-    char* prompt = "$ ";
+	char *cmdline, *p, *jobstart;
+    char interactive = 1;
     
     if (argv[1]) {
         close(0);
@@ -190,7 +265,7 @@ sh (char** argv) {
             unknown(argv, argv[1]);
             return 1;
         }
-        prompt = "";
+        interactive = 0;
     }
 
     nextin = dup(0); /* 2 = stdin  */
@@ -199,9 +274,16 @@ sh (char** argv) {
 
 
     while (1) {
-        mfprintf(1, prompt);
+        if (interactive) {
+            mfprintf(1, "$ "); /* prompt */
+        }
 		cmdline = (char*) pmmalloc(MAX_CMDLINE);
-        getcmd(cmdline, MAX_CMDLINE);
+        if (getcmd(cmdline, MAX_CMDLINE) == EOF) {
+            if (interactive) {
+                mfprintf(1, "\nExit\n");
+            }
+			mexit(0);
+        }
         
 		p = cmdline;
 		jobstart = cmdline;
@@ -217,34 +299,20 @@ sh (char** argv) {
               case '|': /* pipe for future */
                 JOB_PIPE
                 *p++ = '\0'; 
-                job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
-                strcpy(job, jobstart);					/* filling with one section */
-                /* calling an intermediate process : job launcher */
-                send(spawntask(launch_job, DEFAULT_STACK_SIZE, argv), job);
-                pmfree(job);							/* deleting buffer */
-                wait(NULL);     /* waiting for launcher to finish */
+                execute(interactive, 0, jobstart, argv);
                 jobstart = p; /**/
                 continue; /* pointer has been increased already */
               case '&': /* job section boundary */
                 JOB_NOPIPE
                 *p++ = '\0'; 
-                job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
-                strcpy(job, jobstart);					/* filling with one section */
-                /* calling an intermediate process : job launcher */
-                send(spawntask(launch_job, DEFAULT_STACK_SIZE, argv), job);
-                pmfree(job);							/* deleting buffer */
-                wait(NULL);     /* waiting for launcher to finish */
+                execute(interactive, 0, jobstart, argv);
                 jobstart = p; /**/
                 JOB_INIT
                 continue; /* pointer has been increased already */
               case ';': /* command sequence boundary */
                 JOB_NOPIPE
                 *p++ = '\0'; 
-                job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
-                strcpy(job, jobstart);					/* filling with one section */
-                send(spawntask(exec_job, DEFAULT_STACK_SIZE, argv), job);
-		        pmfree(job);							/* deleting buffer */
-                wait(NULL);     /* waiting for launcher to finish */
+                code = execute(interactive, 1, jobstart, argv);
                 jobstart = p; /**/
                 JOB_INIT
                 continue; /* pointer has been increased already */
@@ -253,12 +321,8 @@ sh (char** argv) {
 		}		
 		/* launching last job directly and waiting for it */
         JOB_NOPIPE
-		job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
-		strcpy(job, jobstart);					/* filling with one section */
-		pmfree(cmdline);
-        send(spawntask(exec_job, DEFAULT_STACK_SIZE, argv), job);
-		pmfree(job);							/* deleting buffer */
-        wait(&code);
+        code = execute(interactive, 1, jobstart, argv);
+        pmfree(cmdline);
         JOB_INIT
     }
 }

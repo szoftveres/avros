@@ -628,10 +628,10 @@ kernel (void(*ptp)(void), size_t stack, unsigned char prio) {
 
 		  case KRNL_STOPTASK:       /* Delete the stack of a blocked task */
 			wtask = CURRENT->krncall.stoptask.pid;
-			if(wtask->sb){
+			if (wtask->sb) {
 				free(wtask->sb);
-			}
-			wtask->sb = NULL;
+                wtask->sb = NULL;
+			}			
 			break;
 	  
 		  case KRNL_DELETETASK:     /* Delete a blocked task */

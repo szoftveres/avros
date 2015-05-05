@@ -544,7 +544,8 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
             ((pm_task->param.waitfor == PM_PIDOF(PM_CLIENT)) || 
             (pm_task->param.waitfor == TASK_ANY))) {
         /* parent is waiting for client (or any) */
-        Q_END(&task_q, Q_REMV(&wait_q, pm_task));
+        Q_END(&task_q, Q_REMV(&wait_q, pm_task));        
+        PM_CLIENT->param.exitcode = msg->param.exit.code; /* Save ExitCode from msg */
         msg->param.wait.ans.pid = PM_PIDOF(PM_CLIENT); /* PID */
         msg->param.wait.ans.code = PM_CLIENT->param.exitcode; /* ExitCode */
         *replyto = PM_PIDOF(pm_task); /* Reply to parent */
