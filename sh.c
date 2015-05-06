@@ -322,6 +322,7 @@ sh (char** argv) {
 		/* launching last job directly and waiting for it */
         JOB_NOPIPE
         code = execute(interactive, 1, jobstart, argv);
+        code = code;
         pmfree(cmdline);
         JOB_INIT
     }

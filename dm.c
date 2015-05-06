@@ -20,7 +20,6 @@ typedef struct inode_s {
     mode_t              mode;
     int                 size;
     q_head_t            msgs;
-    dmmsg_t             *msg;
 } inode_t;
 
 #define MAX_I           (12)
@@ -274,7 +273,7 @@ do_pipe (dm_task_t *client, dmmsg_t *msg) {
         return;
     }
     itab[ino].mode = S_IFIFO;
-    itab[ino].msg = NULL;
+    q_init(&(itab[ino].msgs));
 
     /* input */
     fp = find_empty_filp();
@@ -308,7 +307,6 @@ do_pipe (dm_task_t *client, dmmsg_t *msg) {
     filp[fp].inode = ino;
     filp[fp].refcnt++;
     itab[ino].refcnt++;
-    q_init(&(itab[ino].msgs));
  
     msg->param.pipe.fdo = fd;
 
@@ -373,12 +371,12 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
         return; /* refcnt not zero yet */
     }
     if (itab[ino].mode == S_IFIFO) {
-        /* refcnt is zero, send EOF to waiting client */
-        if (itab[ino].msg) {
-            itab[ino].msg->param.rwc.data = EOF;
-            send(itab[ino].msg->client, itab[ino].msg);
-            kfree(itab[ino].msg);
-            itab[ino].msg = NULL;
+        /* One end of the pipe has closed,
+         * hence sending EOF to waiting clients */
+        while(!Q_EMPTY(itab[ino].msgs)) {
+            ((dmmsg_t*)Q_FIRST(itab[ino].msgs))->param.rwc.data = EOF;
+            send(((dmmsg_t*)Q_FIRST(itab[ino].msgs))->client, ((dmmsg_t*)Q_FIRST(itab[ino].msgs)));
+            kfree(Q_REMV(&(itab[ino].msgs), Q_FIRST(itab[ino].msgs)));
         }
     }
     if ((--(itab[ino].refcnt)) ||
@@ -386,11 +384,12 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
         return; /* refcnt || link cnt not zero yet */
     }
 
-    if (itab[ino].mode != S_IFIFO) {
+    if (itab[ino].mode == S_IFIFO) {
+        /* Both ends closed, remove node */
+        ;
+    } else {
         msg->cmd = DM_RMNOD;
         sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));
-    } else {
-
     }
     return;
 }
@@ -434,34 +433,36 @@ do_rw (dm_task_t *client, dmmsg_t *msg) {
         break;
 
       case S_IFIFO:
-        if (!itab[ino].msg) {
+        if (Q_EMPTY(itab[ino].msgs)) {   /* Empty pipe */
             if (itab[ino].refcnt <= 1) {
                 /* Other end detached, send EOF */
                 msg->param.rwc.data = EOF;
             } else {
                 /* FIFO empty, save request */
-                itab[ino].msg = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
-                memcpy(itab[ino].msg, msg, sizeof(dmmsg_t));
+                dmmsg_t* newmsg = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                memcpy(newmsg, msg, sizeof(dmmsg_t));
+                Q_END(&(itab[ino].msgs), newmsg);
                 msg->cmd = DM_DONTREPLY;
             }
-        } else {
-            switch (itab[ino].msg->cmd) {
-              case DM_READC:
-                itab[ino].msg->cmd = DM_READC_ANS;
-                itab[ino].msg->param.rwc.data = msg->param.rwc.data;
+        } else {        /* Read or Write requests in the pipe */
+            if (((dmmsg_t*)Q_FIRST(itab[ino].msgs))->cmd == msg->cmd) {
+                /* Same request type, save it */
+                dmmsg_t* newmsg = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                memcpy(newmsg, msg, sizeof(dmmsg_t));
+                Q_END(&(itab[ino].msgs), newmsg);
+                msg->cmd = DM_DONTREPLY;
+            } else {
+                switch (((dmmsg_t*)Q_FIRST(itab[ino].msgs))->cmd) {
+                  case DM_READC:
+                    ((dmmsg_t*)Q_FIRST(itab[ino].msgs))->param.rwc.data = msg->param.rwc.data;
+                    break;
+                  case DM_WRITEC:
+                    msg->param.rwc.data = ((dmmsg_t*)Q_FIRST(itab[ino].msgs))->param.rwc.data;
+                    break;
+                }
                 /* release waiting task */
-                send(itab[ino].msg->client, itab[ino].msg);
-                kfree(itab[ino].msg);
-                itab[ino].msg = NULL;
-                break;
-              case DM_WRITEC:
-                itab[ino].msg->cmd = DM_WRITEC_ANS;
-                msg->param.rwc.data = itab[ino].msg->param.rwc.data;
-                /* release waiting task */
-                send(itab[ino].msg->client, itab[ino].msg);
-                kfree(itab[ino].msg);
-                itab[ino].msg = NULL;
-                break;
+                send(((dmmsg_t*)Q_FIRST(itab[ino].msgs))->client, ((dmmsg_t*)Q_FIRST(itab[ino].msgs)));
+                kfree(Q_REMV(&(itab[ino].msgs), Q_FIRST(itab[ino].msgs)));
             }
         }
         break;

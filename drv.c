@@ -32,12 +32,12 @@ void usart0_event (void) {
           case EVENT_USART0RX:
             UCSR0B &= ~(1<<RXCIE0); /* Disable RXC interrupt */
             msg.param.interrupt.data = UDR0; /* this will clear RXC flag */
-            msg.param.interrupt.cmd = DM_READC_ANS;
+            msg.param.interrupt.cmd = DM_READC;
             break;
           case EVENT_USART0TX:
             UCSR0B &= ~(1<<TXCIE0); /* Disable TXC interrupt */
             /* Executing the interrupt handler clears TXC flag automatically */
-            msg.param.interrupt.cmd = DM_WRITEC_ANS;
+            msg.param.interrupt.cmd = DM_WRITEC;
             break;
         }
         msg.cmd = DM_INTERRUPT;
@@ -55,7 +55,7 @@ void usart0 (void) {
     dmmsg_t msg;  
     q_head_t rd_q;
     q_head_t wr_q;
-    msgq_t*  elem;
+    dmmsg_t*  elem;
 
     q_init(&rd_q);
     q_init(&wr_q);
@@ -76,18 +76,17 @@ void usart0 (void) {
                 launchtask(interrupt, usart0_event, DEFAULT_STACK_SIZE);
                 msg.client = client;
                 sendrec(interrupt, &msg, sizeof(msg));
-                msg.cmd = DM_MKDEV_ANS; 
             }
             break;
 
           case DM_READC:
-            elem = (msgq_t*)(Q_FIRST(rd_q));
-            if (elem && elem->msg.cmd == DM_INTERRUPT) {
-                msg.param.rwc.data = elem->msg.param.interrupt.data;
+            elem = (dmmsg_t*)(Q_FIRST(rd_q));
+            if (elem && elem->cmd == DM_INTERRUPT) {
+                msg.param.rwc.data = elem->param.interrupt.data;
                 kfree(Q_REMV(&rd_q, elem));
             } else {
-                elem = (msgq_t*) kmalloc(sizeof(msgq_t));
-                memcpy(&(elem->msg), &msg, sizeof(msg));
+                elem = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                memcpy(elem, &msg, sizeof(msg));
                 Q_END(&rd_q, elem);
                 msg.cmd = DM_DONTREPLY;
             }
@@ -95,20 +94,20 @@ void usart0 (void) {
           
           case DM_INTERRUPT:
             switch (msg.param.interrupt.cmd) {
-              case DM_READC_ANS:
+              case DM_READC:
                 if(msg.param.interrupt.data == 0x04){ /* Ctrl + D */
                     msg.param.interrupt.data = EOF;
                 }else{ 
                     usart0_wr(msg.param.interrupt.data); /* ECHO */
                 }
-                elem = (msgq_t*)(Q_FIRST(rd_q));
-                if (elem && elem->msg.cmd == DM_READC) {
-                    msg.client = elem->msg.client;
+                elem = (dmmsg_t*)(Q_FIRST(rd_q));
+                if (elem && elem->cmd == DM_READC) {
+                    msg.client = elem->client;
                     msg.param.rwc.data = msg.param.interrupt.data;
                     kfree(Q_REMV(&rd_q, elem));
                 } else {
-                    elem = (msgq_t*) kmalloc(sizeof(msgq_t));
-                    memcpy(&(elem->msg), &msg, sizeof(msg));
+                    elem = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                    memcpy(elem, &msg, sizeof(msg));
                     Q_END(&rd_q, elem);
                     msg.cmd = DM_DONTREPLY;
                 }
@@ -118,7 +117,6 @@ void usart0 (void) {
 
           case DM_WRITEC:
             usart0_wr(msg.param.rwc.data); 
-            msg.cmd = DM_WRITEC_ANS;
             break;  
         }
         send(client, &msg);
@@ -162,13 +160,13 @@ void devnull (void) {
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch(msg.cmd){
-            case DM_MKDEV:      msg.cmd = DM_MKDEV_ANS;     break;    
-            case DM_INTERRUPT:  msg.cmd = DM_DONTREPLY;     break;
-            case DM_WRITEC:     msg.cmd = DM_WRITEC_ANS;    break;
-            case DM_READC:      
-                msg.cmd = DM_READC_ANS;    
-                msg.param.rwc.data = EOF; 
-                break;
+          case DM_MKDEV:
+            break;    
+          case DM_WRITEC:
+            break;
+          case DM_READC:      
+            msg.param.rwc.data = EOF; 
+            break;
         }
         send(client, &msg);
     }
@@ -188,11 +186,6 @@ void memfile (void) {
         switch(msg.cmd){
           case DM_MKDEV:
             file = (char*)kmalloc(128);
-            msg.cmd = DM_MKDEV_ANS;
-            break;
-
-          case DM_INTERRUPT:
-            msg.cmd = DM_DONTREPLY;
             break;
 
           case DM_WRITEC:
@@ -201,7 +194,6 @@ void memfile (void) {
             } else {
                 file[msg.param.rwc.pos] = (char) msg.param.rwc.data;
             }
-            msg.cmd = DM_WRITEC_ANS;
             break;
           case DM_READC:
             if (msg.param.rwc.pos > 127) {
@@ -209,7 +201,6 @@ void memfile (void) {
             } else {     
                 msg.param.rwc.data = file[msg.param.rwc.pos];
             }
-            msg.cmd = DM_READC_ANS;
             break;
         }
         send(client, &msg);
@@ -227,18 +218,16 @@ void portdevA (void) {
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch(msg.cmd){
-            case DM_MKDEV:      msg.cmd = DM_MKDEV_ANS;     break;    
-            case DM_INTERRUPT:  msg.cmd = DM_DONTREPLY;     break;
-            case DM_WRITEC:
-                DDRA = 0xFF;
-                PORTA = (int)(msg.param.rwc.data);   
-                msg.cmd = DM_WRITEC_ANS;
-                break;
-            case DM_READC:
-                DDRA = 0x00;
-                msg.param.rwc.data = (int) PINA;
-                msg.cmd = DM_READC_ANS;
-                break;
+          case DM_MKDEV:
+            break;    
+          case DM_WRITEC:
+            DDRA = 0xFF;
+            PORTA = (int)(msg.param.rwc.data);   
+            break;
+          case DM_READC:
+            DDRA = 0x00;
+            msg.param.rwc.data = (int) PINA;
+            break;
         }    
         send(client, &msg);
     }
@@ -247,3 +236,29 @@ void portdevA (void) {
 /*
 ================================================================================
  */
+
+void pipedev (void) {
+    pid_t client;
+    dmmsg_t msg;
+
+    while (1) {
+        client = receive(TASK_ANY, &msg, sizeof(msg));
+        switch(msg.cmd){
+          case DM_MKDEV:
+            break;
+          case DM_WRITEC:
+            msg.param.rwc.data = EOF;
+            break;
+          case DM_READC:
+            msg.param.rwc.data = EOF;
+            break;
+        }
+        send(client, &msg);
+    }
+}
+
+
+/*
+================================================================================
+ */
+

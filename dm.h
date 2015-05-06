@@ -20,31 +20,20 @@ enum {
     DM_STAT,
 
     DM_MKDEV,
-    DM_MKDEV_ANS,
-    DM_RMDEV,
-    DM_RMDEV_ANS,
 
     DM_MKNOD,
-    DM_MKNOD_ANS,
     DM_RMNOD,
-    DM_RMNOD_ANS,
 
     DM_DUP,
-    DM_DUP_ANS,
 
 
     DM_PIPE,
-    DM_PIPE_ANS,
 
     DM_OPEN,
-    DM_OPEN_ANS,
     DM_CLOSE,
-    DM_CLOSE_ANS,
 
     DM_READC,                    /* char read */
-    DM_READC_ANS,
     DM_WRITEC,                    /* char write */
-    DM_WRITEC_ANS,
 
     DM_ADDTASK,                /* Add taks */
     DM_DELTASK                 /* Del task */
@@ -194,6 +183,7 @@ typedef union param_u {
  */
 
 typedef struct dmmsg_s {
+    QUEUE_HEADER;
     int             cmd;        /* command */
     pid_t           client;     /* client (client who requests IO) */
     param_t         param;      /* parameter */
@@ -202,13 +192,6 @@ typedef struct dmmsg_s {
 /*
  *
  */
-
-
-typedef struct msgq_s {
-    QUEUE_HEADER;
-    dmmsg_t msg;  
-} msgq_t;
-
 
 
 void dm (void);
