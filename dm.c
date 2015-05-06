@@ -357,6 +357,9 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
     int fp;
     int ino;
     int fd = msg->param.openclose.fd;
+    dmmsg_t* msg_p; /* Temporary pointer */
+    
+
     if (fd < 0) {
         return; /* Nothing to close */
     }   
@@ -374,9 +377,10 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
         /* One end of the pipe has closed,
          * hence sending EOF to waiting clients */
         while(!Q_EMPTY(itab[ino].msgs)) {
-            ((dmmsg_t*)Q_FIRST(itab[ino].msgs))->param.rwc.data = EOF;
-            send(((dmmsg_t*)Q_FIRST(itab[ino].msgs))->client, ((dmmsg_t*)Q_FIRST(itab[ino].msgs)));
-            kfree(Q_REMV(&(itab[ino].msgs), Q_FIRST(itab[ino].msgs)));
+            msg_p = (dmmsg_t*) Q_FIRST(itab[ino].msgs);
+            msg_p->param.rwc.data = EOF;
+            send(msg_p->client, msg_p);
+            kfree(Q_REMV(&(itab[ino].msgs), msg_p));
         }
     }
     if ((--(itab[ino].refcnt)) ||
@@ -402,6 +406,8 @@ static void
 do_rw (dm_task_t *client, dmmsg_t *msg) {
     int fd = msg->param.rwc.fd;
     int ino;
+    dmmsg_t* msg_p; /* Temporary pointer */
+
     if ((fd < 0) || (client->fd[fd] < 0)) {
         msg->param.rwc.data = EOF; /* wrong fd */
         return;
@@ -439,30 +445,31 @@ do_rw (dm_task_t *client, dmmsg_t *msg) {
                 msg->param.rwc.data = EOF;
             } else {
                 /* FIFO empty, save request */
-                dmmsg_t* newmsg = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
-                memcpy(newmsg, msg, sizeof(dmmsg_t));
-                Q_END(&(itab[ino].msgs), newmsg);
+                msg_p = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                memcpy(msg_p, msg, sizeof(dmmsg_t));
+                Q_END(&(itab[ino].msgs), msg_p);
                 msg->cmd = DM_DONTREPLY;
             }
         } else {        /* Read or Write requests in the pipe */
-            if (((dmmsg_t*)Q_FIRST(itab[ino].msgs))->cmd == msg->cmd) {
+            msg_p = (dmmsg_t*) Q_FIRST(itab[ino].msgs);
+            if (msg_p->cmd == msg->cmd) {
                 /* Same request type, save it */
-                dmmsg_t* newmsg = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
-                memcpy(newmsg, msg, sizeof(dmmsg_t));
-                Q_END(&(itab[ino].msgs), newmsg);
+                msg_p = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                memcpy(msg_p, msg, sizeof(dmmsg_t));
+                Q_END(&(itab[ino].msgs), msg_p);
                 msg->cmd = DM_DONTREPLY;
             } else {
-                switch (((dmmsg_t*)Q_FIRST(itab[ino].msgs))->cmd) {
+                switch (msg_p->cmd) {
                   case DM_READC:
-                    ((dmmsg_t*)Q_FIRST(itab[ino].msgs))->param.rwc.data = msg->param.rwc.data;
+                    msg_p->param.rwc.data = msg->param.rwc.data;
                     break;
                   case DM_WRITEC:
-                    msg->param.rwc.data = ((dmmsg_t*)Q_FIRST(itab[ino].msgs))->param.rwc.data;
+                    msg->param.rwc.data = msg_p->param.rwc.data;
                     break;
                 }
                 /* release waiting task */
-                send(((dmmsg_t*)Q_FIRST(itab[ino].msgs))->client, ((dmmsg_t*)Q_FIRST(itab[ino].msgs)));
-                kfree(Q_REMV(&(itab[ino].msgs), Q_FIRST(itab[ino].msgs)));
+                send(msg_p->client, msg_p);
+                kfree(Q_REMV(&(itab[ino].msgs), msg_p));
             }
         }
         break;
