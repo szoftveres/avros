@@ -92,11 +92,10 @@ getopt_p
 initgetopt (void) {
     getopt_p opt_p;
     opt_p = pmmalloc(sizeof(getopt_t));
-    if (opt_p) {
-        memset(opt_p, 0, sizeof(getopt_t));
-        opt_p->optind = 1;
-        opt_p->sp = 1;
-    }
+    ASSERT(opt_p);
+    memset(opt_p, 0, sizeof(getopt_t));
+    opt_p->optind = 1;
+    opt_p->sp = 1;
     return (opt_p);
 }
 
@@ -157,4 +156,11 @@ void unknown(char** argv, const char* s) {
 
 void noargs(char** argv) {
     mfprintf(2, "%s: args?\n", argv[0]);
+}
+
+void massert (int val, char* file, int line) {
+    if (!val) {
+        mfprintf(2, "[%s:%d] assert fail\n", file, line);
+        mexit(-1);
+    }
 }

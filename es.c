@@ -48,21 +48,15 @@ typedef union getprg_u {
 } getprg_t;
 
 /*
- * PARAMETER
- */
-
-typedef union es_param_u {
-    regprg_t        regprg;
-    getprg_t        getprg;
-} es_param_t; 
-
-/*
  * MESSAGE
  */
 
 typedef struct es_msg_s {
     int             cmd;
-    es_param_t      param;
+    union {
+        regprg_t        regprg;
+        getprg_t        getprg;
+    }; 
 } es_msg_t;
 
 /*
@@ -147,13 +141,13 @@ es (void) {
         msg_client = receive(TASK_ANY, &msg, sizeof(msg));
         switch(msg.cmd){
           case ES_REGPRG:
-            if(!es_reg_prg(msg.param.regprg.name, 
-                        msg.param.regprg.ptr, msg.param.regprg.stack)){
+            if(!es_reg_prg(msg.regprg.name, 
+                        msg.regprg.ptr, msg.regprg.stack)){
                 continue;
             }
             break;
           case ES_GETPRG:         
-            es_get_prg(msg.param.getprg.ask.name, &(msg.param.getprg.ans.ptr), &(msg.param.getprg.ans.stack));
+            es_get_prg(msg.getprg.ask.name, &(msg.getprg.ans.ptr), &(msg.getprg.ans.stack));
             break;
         }
         send(msg_client, &msg);
@@ -181,9 +175,9 @@ void
 es_regprg (char* name, int(*ptr)(char**), size_t stack) {
     es_msg_t msg;
     msg.cmd = ES_REGPRG;
-    msg.param.regprg.name = name;
-    msg.param.regprg.ptr = ptr;
-    msg.param.regprg.stack = stack;
+    msg.regprg.name = name;
+    msg.regprg.ptr = ptr;
+    msg.regprg.stack = stack;
     sendrec(estask, &msg, sizeof(msg));
     return;
 }
@@ -196,10 +190,10 @@ void
 es_getprg (char* name, int(**ptr)(char**), size_t *stack) {
     es_msg_t msg;
     msg.cmd = ES_GETPRG;
-    msg.param.getprg.ask.name = name;
+    msg.getprg.ask.name = name;
     sendrec(estask, &msg, sizeof(msg));
-    *ptr = msg.param.getprg.ans.ptr;
-    *stack = msg.param.getprg.ans.stack;
+    *ptr = msg.getprg.ans.ptr;
+    *stack = msg.getprg.ans.stack;
 }
 
 

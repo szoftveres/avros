@@ -22,6 +22,7 @@ int at (char** argv);
 int pr_uptime (char** argv);
 
 int f_stat (char** argv);
+int f_mknod (char** argv);
 
 int grep (char** argv);
 

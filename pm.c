@@ -17,7 +17,7 @@ typedef struct pm_task_s {
     union {
         pid_t           waitfor;   /* Waits for this pid to die */
         int             exitcode;  /* Exit code of zombie */
-    } param;
+    };
     struct pm_task_s*   parent;
 } pm_task_t;
 
@@ -59,36 +59,28 @@ enum {
  * SPAWN 
  */
 
-typedef struct ask_spawn_s {
-    int(*ptp)(char**);              /* task entry */
-    size_t  stack;                  /* stack size */
-	char**  argv;                   /* argv */
-} ask_spawn_t;
-
-typedef struct ans_spawn_s {
-    pid_t pid;                      /* pid */
-} ans_spawn_t;
-
 typedef union spawn_u {
-    ask_spawn_t ask;                /* ask */
-    ans_spawn_t ans;                /* answer */
+    struct {
+        int(*ptp)(char**);              /* task entry */
+        size_t  stack;                  /* stack size */
+	    char**  argv;                   /* argv */
+    } ask;
+    struct {
+        pid_t pid;                      /* pid */
+    } ans;
 } spawn_t;
 
 /*
  * EXEC
  */
 
-typedef struct ask_exec_s {
-    char*           name;           /* prg name */
-    char**          argv;           /* argv */
-} ask_exec_t;
-
-typedef struct ans_exec_s {
-} ans_exec_t;
-
 typedef union exec_u {
-    ask_exec_t   ask;               /* ask */
-    ans_exec_t   ans;               /* answer */
+    struct {
+        char*           name;           /* prg name */
+        char**          argv;           /* argv */
+    } ask;
+    struct {
+    } ans;
 } exec_t;
 
 /*
@@ -103,35 +95,27 @@ typedef struct exit_s {
  * WAIT
  */
 
-typedef struct ask_wait_s {
-    pid_t pid;                      /* pid */
-} ask_wait_t;
-
-typedef struct ans_wait_s {
-    pid_t pid;                      /* pid */
-    int   code;                     /* exit code */
-} ans_wait_t;
-
 typedef union wait_s {
-    ask_wait_t ask;                 /* ask */
-    ans_wait_t ans;                 /* answer */
+    struct {
+        pid_t pid;                      /* pid */
+    } ask;
+    struct {
+        pid_t pid;                      /* pid */
+        int   code;                     /* exit code */
+    } ans;
 } wait_t;
 
 /*
  * MALLOC
  */
 
-typedef struct ask_pmmalloc_s {
-    size_t          size;           /* size */
-} ask_pmmalloc_t;
-
-typedef struct ans_pmmalloc_s {
-    void*           ptr;            /* ptr */
-} ans_pmmalloc_t;
-
 typedef union pmmalloc_u {
-    ask_pmmalloc_t   ask;           /* ask */
-    ans_pmmalloc_t   ans;           /* answer */
+    struct {
+        size_t          size;           /* size */
+    } ask;
+    struct {
+        void*           ptr;            /* ptr */
+    } ans;
 } pmmalloc_t;
 
 
@@ -161,26 +145,20 @@ typedef struct register_s {
 } register_t;
 
 /*
- * PM CALL
- */
-
-typedef union pm_param_u {
-    spawn_t         spawn;          /* spawn */
-    exec_t          exec;           /* reg prg */
-    exit_t          exit;           /* exit */
-    wait_t          wait;           /* wait */
-    pmmalloc_t      malloc;         /* malloc */
-    register_t      reg;            /* register */
-    pmfree_t        free;           /* free */
-} pm_param_t;
-
-/*
  *
  */
 
 typedef struct pmmsg_s {
     int cmd;
-    pm_param_t param;
+    union {
+        spawn_t         spawn;          /* spawn */
+        exec_t          exec;           /* reg prg */
+        exit_t          exit;           /* exit */
+        wait_t          wait;           /* wait */
+        pmmalloc_t      malloc;         /* malloc */
+        register_t      reg;            /* register */
+        pmfree_t        free;           /* free */
+    };
 } pmmsg_t;
 
 
@@ -244,8 +222,8 @@ pm_findzombie (q_head_t* que UNUSED, q_item_t* ptsk) {
     if(((pm_task_t*)ptsk)->parent != PM_CLIENT) {
         return NULL;
     }
-    if(((PM_CLIENT->param.waitfor != PM_PIDOF(((pm_task_t*)ptsk))) 
-        && (PM_CLIENT->param.waitfor != TASK_ANY))){
+    if(((PM_CLIENT->waitfor != PM_PIDOF(((pm_task_t*)ptsk))) 
+        && (PM_CLIENT->waitfor != TASK_ANY))){
     	return (NULL);
 	}
     return (ptsk);
@@ -454,11 +432,11 @@ int
 do_reg (pmmsg_t* msg) {
     pm_task_t*  pm_task;
 
-    pm_task = pm_newtask(msg->param.reg.pid, NULL);
+    pm_task = pm_newtask(msg->reg.pid, NULL);
     if(!Q_END(&task_q, pm_task)){
         return 0;   /* Sorry... */
     }
-    if(!dm_addtask(msg->param.reg.pid, NULL)){
+    if(!dm_addtask(msg->reg.pid, NULL)){
         return 0;
     }
     return 1;
@@ -483,12 +461,12 @@ do_spawn (pmmsg_t* msg) {
     if (!dm_addtask(task, PM_PIDOF(PM_CLIENT))){
         return;   /* Sorry... */
     }
-    if (!push_cpucontext(pm_task, msg->param.spawn.ask.stack, 
-        msg->param.spawn.ask.ptp, msg->param.spawn.ask.argv)) {
+    if (!push_cpucontext(pm_task, msg->spawn.ask.stack, 
+        msg->spawn.ask.ptp, msg->spawn.ask.argv)) {
         return;   /* Sorry... */
     }
     starttask(task);
-    msg->param.spawn.ans.pid = task;
+    msg->spawn.ans.pid = task;
     return;
 }
 
@@ -500,12 +478,12 @@ do_exec (pmmsg_t* msg) {
     int(*ptr)(char**);
     size_t stacksize;
 
-    es_getprg(msg->param.exec.ask.name, &ptr, &stacksize);          
+    es_getprg(msg->exec.ask.name, &ptr, &stacksize);          
     if (!ptr) {
         return 1;  /* Error, send reply */
     }
     if (!push_cpucontext(PM_CLIENT, stacksize, ptr,
-            msg->param.exec.ask.argv)) {
+            msg->exec.ask.argv)) {
         /* nothing to do, task should be removed completely */
         return 0;
     }
@@ -541,18 +519,18 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
     /* check whether parent task is in the waiting queue */
     pm_task = (pm_task_t*) q_forall(&wait_q, pm_findmyparent);
     if (pm_task && 
-            ((pm_task->param.waitfor == PM_PIDOF(PM_CLIENT)) || 
-            (pm_task->param.waitfor == TASK_ANY))) {
+            ((pm_task->waitfor == PM_PIDOF(PM_CLIENT)) || 
+            (pm_task->waitfor == TASK_ANY))) {
         /* parent is waiting for client (or any) */
         Q_END(&task_q, Q_REMV(&wait_q, pm_task));        
-        PM_CLIENT->param.exitcode = msg->param.exit.code; /* Save ExitCode from msg */
-        msg->param.wait.ans.pid = PM_PIDOF(PM_CLIENT); /* PID */
-        msg->param.wait.ans.code = PM_CLIENT->param.exitcode; /* ExitCode */
+        PM_CLIENT->exitcode = msg->exit.code; /* Save ExitCode from msg */
+        msg->wait.ans.pid = PM_PIDOF(PM_CLIENT); /* PID */
+        msg->wait.ans.code = PM_CLIENT->exitcode; /* ExitCode */
         *replyto = PM_PIDOF(pm_task); /* Reply to parent */
         kfree(Q_REMV(&task_q, PM_CLIENT)); /* Remove PM_CLIENT */
     } else {
         /* parent is not waiting yet */
-        PM_CLIENT->param.exitcode = msg->param.exit.code;
+        PM_CLIENT->exitcode = msg->exit.code;
         Q_END(&zombie_q, Q_REMV(&task_q, PM_CLIENT));
         /* Client is now zombie */
 	    return 0; /* No reply */
@@ -567,19 +545,19 @@ int
 do_wait (pmmsg_t* msg) {
     pm_task_t*  pm_task;
 
-    PM_CLIENT->param.waitfor = msg->param.wait.ask.pid;
+    PM_CLIENT->waitfor = msg->wait.ask.pid;
     pm_task = (pm_task_t*) q_forall(&zombie_q, pm_findzombie);
     if (pm_task) {	/* found a zombie child */
-        msg->param.wait.ans.pid = PM_PIDOF(pm_task); /* PID */
-        msg->param.wait.ans.code = pm_task->param.exitcode; /*Exit Code*/
+        msg->wait.ans.pid = PM_PIDOF(pm_task); /* PID */
+        msg->wait.ans.code = pm_task->exitcode; /*Exit Code*/
         kfree(Q_REMV(&zombie_q, pm_task)); /* Remove zombie child */
         return 1; /* Reply to client */
     }
     if (!q_forall(&task_q, pm_haschild) && 
             !q_forall(&wait_q, pm_haschild)) {
         /* ERROR, no child at all */
-        msg->param.wait.ans.pid = 0; /* PID */
-        msg->param.wait.ans.code = 0; /* Exit Code */
+        msg->wait.ans.pid = 0; /* PID */
+        msg->wait.ans.code = 0; /* Exit Code */
         return 1; /* XXX Reply to client */
     }
     /* Client is waiting */
@@ -595,17 +573,17 @@ do_pmalloc (pmmsg_t* msg) {
 
     mem_chunk_t *chunk = (mem_chunk_t*) kmalloc(sizeof(mem_chunk_t));
     if (!chunk) {
-        msg->param.malloc.ans.ptr = NULL;
+        msg->malloc.ans.ptr = NULL;
         return;
     }
-    chunk->ptr = kmalloc(msg->param.malloc.ask.size);
+    chunk->ptr = kmalloc(msg->malloc.ask.size);
     if(!chunk->ptr){
         kfree(chunk);
-        msg->param.malloc.ans.ptr = NULL;
+        msg->malloc.ans.ptr = NULL;
         return;
     }
     Q_FRONT(&(PM_CLIENT->chunk_q), chunk);
-    msg->param.malloc.ans.ptr = chunk->ptr;
+    msg->malloc.ans.ptr = chunk->ptr;
     return; 
 }
 
@@ -614,7 +592,7 @@ do_pmalloc (pmmsg_t* msg) {
 
 void
 do_pmfree (pmmsg_t* msg) {
-    mem_chunk_t* chunk = findchunk(PM_CLIENT, msg->param.free.ptr);
+    mem_chunk_t* chunk = findchunk(PM_CLIENT, msg->free.ptr);
     if (chunk && chunk->ptr) {
         kfree (chunk->ptr);
     }
@@ -710,11 +688,11 @@ pid_t
 spawntask (int(*ptsk)(char**), size_t stacksize, char** argv) {
     pmmsg_t msg;
     msg.cmd = PM_SPAWN;
-    msg.param.spawn.ask.ptp = ptsk;
-    msg.param.spawn.ask.stack = stacksize;
-    msg.param.spawn.ask.argv = argv;
+    msg.spawn.ask.ptp = ptsk;
+    msg.spawn.ask.stack = stacksize;
+    msg.spawn.ask.argv = argv;
     sendrec(pmtask, &msg, sizeof(msg));
-    return (msg.param.spawn.ans.pid);
+    return (msg.spawn.ans.pid);
 }
 
 /*
@@ -725,8 +703,8 @@ int
 execv (char* name, char** argv) {
     pmmsg_t msg;
     msg.cmd = PM_EXEC;
-    msg.param.exec.ask.name = name;
-    msg.param.exec.ask.argv = argv;
+    msg.exec.ask.name = name;
+    msg.exec.ask.argv = argv;
     sendrec(pmtask, &msg, sizeof(msg));
     return (-1);
 }
@@ -739,7 +717,7 @@ void
 mexit (int code) {
     pmmsg_t msg;
     msg.cmd = PM_EXIT;
-    msg.param.exit.code = code;
+    msg.exit.code = code;
     sendrec(pmtask, &msg, sizeof(msg));
     /* NEVER REACHED */
     return;
@@ -753,12 +731,12 @@ pid_t
 wait (int* code) {
     pmmsg_t msg;
     msg.cmd = PM_WAIT;
-	msg.param.wait.ask.pid = TASK_ANY;
+	msg.wait.ask.pid = TASK_ANY;
     sendrec(pmtask, &msg, sizeof(msg));
     if(code){
-        *code = msg.param.wait.ans.code;
+        *code = msg.wait.ans.code;
     }
-    return (msg.param.wait.ans.pid);
+    return (msg.wait.ans.pid);
 }
 
 /*
@@ -769,12 +747,12 @@ pid_t
 waitpid (pid_t p, int* code) {
     pmmsg_t msg;
     msg.cmd = PM_WAIT;
-	msg.param.wait.ask.pid = p;
+	msg.wait.ask.pid = p;
     sendrec(pmtask, &msg, sizeof(msg));
     if (code) {
-        *code = msg.param.wait.ans.code;
+        *code = msg.wait.ans.code;
     }
-    return (msg.param.wait.ans.pid);
+    return (msg.wait.ans.pid);
 }
 
 
@@ -786,9 +764,9 @@ void*
 pmmalloc (size_t size) {
     pmmsg_t msg;
     msg.cmd = PM_MALLOC;
-    msg.param.malloc.ask.size = size;
+    msg.malloc.ask.size = size;
     sendrec(pmtask, &msg, sizeof(msg));
-    return (msg.param.malloc.ans.ptr);
+    return (msg.malloc.ans.ptr);
 }
 
 /*
@@ -799,7 +777,7 @@ void
 pmfree (void* ptr) {
     pmmsg_t msg;
     msg.cmd = PM_FREE;
-    msg.param.free.ptr = ptr;
+    msg.free.ptr = ptr;
     sendrec(pmtask, &msg, sizeof(msg));
     return;
 }
@@ -812,7 +790,7 @@ void
 pmreg (pid_t pid) {
     pmmsg_t msg;
     msg.cmd = PM_REG;
-    msg.param.reg.pid = pid;
+    msg.reg.pid = pid;
     sendrec(pmtask, &msg, sizeof(msg));
     return;
 }

@@ -34,7 +34,7 @@ init (void) {
     pid_t pid;
 
     session_t session[] = {
-            {"getty", "usart0", NULL},
+            {"getty", "1/0", NULL},
 //            {"getty", "usart1", NULL}, 
     };    
 

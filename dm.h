@@ -3,6 +3,8 @@
 
 #include "queue.h"
 
+
+
 typedef enum mode_s {
     S_IFREG,
     S_IFCHR,
@@ -27,10 +29,20 @@ enum {
     DM_DUP,
 
 
+    DM_IGET,
+    DM_IPUT,
+    DM_ICREAT,
+
+    DM_LINK,
+    DM_UNLINK,
+    
+
     DM_PIPE,
 
     DM_OPEN,
+    DM_OPENI,
     DM_CLOSE,
+    DM_CREAT,
 
     DM_READC,                    /* char read */
     DM_WRITEC,                    /* char write */
@@ -68,8 +80,14 @@ typedef struct adddel_s {
  */
 
 typedef struct rwc_s {
-    int             fd;
-    int             pos;
+    union {
+        int             fd;
+        int             inum;
+    };
+    union {
+        int             pos;
+        int             bnum;
+    };
     int             data;       /* data */
 } rwc_t;
 
@@ -79,7 +97,13 @@ typedef struct rwc_s {
 
 typedef struct openclose_s {
     union {
-        char*           name;         /* fname */
+        union {
+            char*           name;         /* fname */
+            struct {
+                int     dev;
+                int     inum;
+            };
+        };
         int             fd;         /* fd */
     };
 } openclose_t;
@@ -88,18 +112,14 @@ typedef struct openclose_s {
  * STAT
  */
 
-typedef struct stat_ask_s {
-    char*           name;         /* fname */
-} stat_ask_t;
-
-typedef struct stat_ans_s {
-    int             code;
-    struct stat     st_stat;
-} stat_ans_t;
-
 typedef struct stat_s {
-    stat_ask_t      ask;
-    stat_ans_t      ans;
+    struct {
+        char*           name;         /* fname */
+    } ask;
+    struct {
+        int             code;
+        struct stat     st_stat;
+    } ans;
 } stat_t;
 
 
@@ -107,17 +127,13 @@ typedef struct stat_s {
  * MKDEV
  */
 
-typedef struct mkdev_ask_s {
-    void(*driver)(void);        /* driver */
-} mkdev_ask_t;
-
-typedef struct mkdev_ans_s {
-    int             id;         /* devtab id */
-} mkdev_ans_t;
-
 typedef union mkdev_u {
-    mkdev_ask_t     ask;        /* ask */
-    mkdev_ans_t     ans;        /* answer */
+    struct {
+        void(*driver)(void);        /* driver */
+    } ask;
+    struct {
+        int             id;         /* devtab id */
+    } ans;
 } mkdev_t;
 
 
@@ -163,20 +179,44 @@ typedef struct dup_s {
 
 
 /*
- * PARAMETERS
+ *
  */
+typedef union iget_u {
+    struct {
+        int     num;
+    } ask;
+    struct {
+        mode_t     mode;
+    } ans;
+} iget_t;
 
-typedef union param_u {
-    interrupt_t     interrupt;
-    stat_t          stat;       /* stat */
-    openclose_t     openclose;  /* open close*/
-    rwc_t           rwc;        /* character read/write */
-    mkdev_t         mkdev;
-    mknod_t         mknod;
-    dup_t           dup;
-    pipe_t          pipe;
-    adddel_t        adddel;        /* Client add del*/
-} param_t;
+typedef union iput_u {
+    struct {
+        int     num;
+    } ask;
+} iput_t;
+
+typedef union icreat_u {
+    struct {
+        mode_t  mode;
+    } ask;
+    struct {
+        int     num;
+    } ans;
+} icreat_t;
+
+
+typedef union link_u {
+    struct {
+        int     num;
+    } ask;
+} link_t;
+
+typedef union unlink_u {
+    struct {
+        int     num;
+    } ask;
+} unlink_t;
 
 /*
  * MESSAGE
@@ -186,7 +226,22 @@ typedef struct dmmsg_s {
     QUEUE_HEADER;
     int             cmd;        /* command */
     pid_t           client;     /* client (client who requests IO) */
-    param_t         param;      /* parameter */
+    union {
+        interrupt_t     interrupt;
+        stat_t          stat;       /* stat */
+        openclose_t     openclose;  /* open close*/
+        rwc_t           rw;         /* character read/write */
+        mkdev_t         mkdev;
+        mknod_t         mknod;
+        dup_t           dup;
+        pipe_t          pipe;
+        adddel_t        adddel;        /* Client add del*/
+        iget_t          iget;
+        iput_t          iput;
+        icreat_t        icreat;
+        link_t          link;
+        unlink_t        unlink;
+    };
 } dmmsg_t;
 
 /*
@@ -212,6 +267,7 @@ int mkdev (void(*p)(void));
 int mknod (int dev, char* name, mode_t mode);
 int pipe(int pipefd[2]);
 int open (char *name);
+int openi (int dev, int inum);
 int dup (int fd);
 int fstat (char *name, struct stat *st_stat);
 void close (int fd);

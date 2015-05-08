@@ -9,32 +9,26 @@
 #define MAX_DEV         (6) /* u1, u2, null, pipe, eeprom, ramdisk */
 static pid_t            devtab[MAX_DEV];
 
+
 /*
  * INODE
  */
 
 typedef struct inode_s {
     int                 dev;
+    int                 num;    /* inode number on device */
     char                refcnt;
-    char                links;
     mode_t              mode;
-    int                 size;
-    q_head_t            msgs;
+    union {
+        q_head_t            msgs;
+    };
 } inode_t;
+
+
 
 #define MAX_I           (12)
 static inode_t          itab[MAX_I];
 
-/*
- * DIRTAB
- */
-typedef struct dirtab_s {
-    QUEUE_HEADER
-    int                 ino;
-    char*               name;
-} dirtab_t;
-
-static q_head_t         dirtab;
 /*
  *  FILP
  */
@@ -69,7 +63,6 @@ dm_init (void) {
     memset(filp, 0, (sizeof(filp)));
     memset(devtab, 0, (sizeof(devtab)));
     memset(itab, 0, (sizeof(itab)));
-    q_init(&dirtab);
     q_init(&dm_task_q); 
 }
 
@@ -96,7 +89,7 @@ static int
 find_empty_itab (void) {
     int i;
     for (i=0; i < MAX_I; i++) {
-        if (!itab[i].refcnt && !itab[i].links) {
+        if (!itab[i].refcnt) {
             return i; 
         }
     }
@@ -134,22 +127,6 @@ find_empty_fd (dm_task_t *client) {
 }
 
 /*
- *
- */
-
-static dirtab_t*
-dm_findbyname (char* name) {
-    dirtab_t *it = (dirtab_t*)Q_FIRST(dirtab);
-    while (it) {
-        if (!strcmp(it->name,name)) {
-            break;
-        }
-        it = (dirtab_t*)Q_NEXT(it);
-    }
-    return (it);
-}
-
-/*
  * ====================================================
  */
 
@@ -158,23 +135,23 @@ static void
 do_dup (dm_task_t *client, dmmsg_t *msg) {
     int fp;
     int fd;
-    if (msg->param.dup.fd < 0) {
-        msg->param.dup.fd = -1;  /* Nothing to dup */
+    if (msg->dup.fd < 0) {
+        msg->dup.fd = -1;  /* Nothing to dup */
         return;
     }
-    fp = client->fd[msg->param.dup.fd];
+    fp = client->fd[msg->dup.fd];
     if (fp < 0) {
-        msg->param.dup.fd = -1;  /* Nothing to dup */
+        msg->dup.fd = -1;  /* Nothing to dup */
         return;
     }
     fd = find_empty_fd(client);
     if (fd < 0) {
-        msg->param.dup.fd = -1;  /* No free fd */
+        msg->dup.fd = -1;  /* No free fd */
         return;
     }
     client->fd[fd] = fp;
     filp[fp].refcnt++;
-    msg->param.dup.fd = fd;
+    msg->dup.fd = fd;
     return;
 }
 
@@ -189,16 +166,66 @@ do_mkdev (dmmsg_t *msg) {
 
     i = find_empty_devtab();
     if (i < 0) {
-        msg->param.mkdev.ans.id = -1;
+        msg->mkdev.ans.id = -1;
         return;
     }
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, msg->param.mkdev.ask.driver, DEFAULT_STACK_SIZE);
+    launchtask(pid, msg->mkdev.ask.driver, DEFAULT_STACK_SIZE);
     devtab[i] = pid;
 
     msg->cmd = DM_MKDEV;
     sendrec(pid, msg, sizeof(dmmsg_t));
-    msg->param.mkdev.ans.id = i;
+    msg->mkdev.ans.id = i;
+    return;
+}
+
+/*
+ *
+ */
+
+int
+createnode (int dev, mode_t mode) {
+    dmmsg_t msg;
+    msg.cmd = DM_ICREAT;
+    msg.icreat.ask.mode = mode;
+    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
+    return msg.icreat.ans.num;
+}
+
+mode_t
+getnode (int dev, int num) {
+    dmmsg_t msg;
+    msg.cmd = DM_IGET;
+    msg.iget.ask.num = num;
+    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
+    return msg.iget.ans.mode;
+}
+
+void
+putnode (int dev, int num) {
+    dmmsg_t msg;
+    msg.cmd = DM_IPUT;
+    msg.iput.ask.num = num;
+    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
+    return;
+}
+
+
+void
+linknode (int dev, int num) {
+    dmmsg_t msg;
+    msg.cmd = DM_LINK;
+    msg.iget.ask.num = num;
+    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
+    return;
+}
+
+void
+unlinknode (int dev, int num) {
+    dmmsg_t msg;
+    msg.cmd = DM_LINK;
+    msg.iget.ask.num = num;
+    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
     return;
 }
 
@@ -208,33 +235,13 @@ do_mkdev (dmmsg_t *msg) {
 
 static void
 do_mknod (dmmsg_t *msg) {
-    int ino;
-    dirtab_t *dirent;
-    ino = find_empty_itab();            
-    if (ino < 0) {
-        msg->param.mknod.ino = -1;
-        return;
-    }
-    dirent = (dirtab_t*)kmalloc(sizeof(dirtab_t));
-    if (!dirent) {
-        msg->param.mknod.ino = -1;
-        return;
-    }
-    dirent->name = kmalloc(strlen(msg->param.mknod.name)+1);
-    if (!dirent->name) {
-        kfree(dirent);
-        msg->param.mknod.ino = -1;
-        return;
-    }
-    Q_END(&dirtab, dirent);
-    strcpy(dirent->name, msg->param.mknod.name);
-    itab[ino].dev = msg->param.mknod.id;
-    itab[ino].mode = msg->param.mknod.mode;
-    itab[ino].size = 0;
-    itab[ino].links++; /* hard link count */
-    q_init(&(itab[ino].msgs));
-    dirent->ino = ino;
-    msg->param.mknod.ino = ino;
+    int inum;
+
+    inum = createnode(msg->mknod.id, msg->mknod.mode);
+
+    linknode(msg->mknod.id, inum);
+
+    msg->mknod.ino = inum;
     return;
 }
 
@@ -245,16 +252,14 @@ do_mknod (dmmsg_t *msg) {
 
 static void
 do_stat (dmmsg_t *msg) {
-    dirtab_t* dirent = dm_findbyname(msg->param.stat.ask.name);
-    if (!dirent) { /* name not found, error */ 
-        msg->param.stat.ans.code = -1;
-        return;
-    }
-    msg->param.stat.ans.st_stat.ino = dirent->ino;
-    msg->param.stat.ans.st_stat.dev = itab[dirent->ino].dev;
-    msg->param.stat.ans.st_stat.size = itab[dirent->ino].size;
-    msg->param.stat.ans.st_stat.mode = itab[dirent->ino].mode;
-    msg->param.stat.ans.code = 0;
+
+    msg->stat.ans.st_stat.ino = msg->stat.ans.st_stat.ino;
+    /*
+    msg->stat.ans.st_stat.dev = itab[dirent->ino].dev;
+    msg->stat.ans.st_stat.size = itab[dirent->ino].size;
+    msg->stat.ans.st_stat.mode = itab[dirent->ino].mode;
+    msg->stat.ans.code = 0;
+    */
     return;
 }
 
@@ -269,38 +274,40 @@ do_pipe (dm_task_t *client, dmmsg_t *msg) {
     int ino;
     ino = find_empty_itab();            
     if (ino < 0) {
-        msg->param.pipe.result = -1;
+        msg->pipe.result = -1;
         return;
     }
-    itab[ino].mode = S_IFIFO;
-    q_init(&(itab[ino].msgs));
+
+    itab[ino].dev = 0;
+    itab[ino].num = createnode(itab[ino].dev, S_IFIFO);  /* Assumption: device 0 is PIPE */
+    itab[ino].mode = getnode(0, itab[ino].num);
 
     /* input */
     fp = find_empty_filp();
     if (fp < 0) {
-        msg->param.pipe.result = -1;
+        msg->pipe.result = -1;
         return;
     }
     fd = find_empty_fd(client);
     if (fd < 0) {
-        msg->param.pipe.result = -1;
+        msg->pipe.result = -1;
         return;
     }
     client->fd[fd] = fp;
     filp[fp].inode = ino;
     filp[fp].refcnt++;
     itab[ino].refcnt++; 
-    msg->param.pipe.fdi = fd;
+    msg->pipe.fdi = fd;
 
     /* output */
     fp = find_empty_filp();
     if (fp < 0) {
-        msg->param.pipe.result = -1;
+        msg->pipe.result = -1;
         return;
     }
     fd = find_empty_fd(client);
     if (fd < 0) {
-        msg->param.pipe.result = -1;
+        msg->pipe.result = -1;
         return;
     }
     client->fd[fd] = fp;
@@ -308,9 +315,10 @@ do_pipe (dm_task_t *client, dmmsg_t *msg) {
     filp[fp].refcnt++;
     itab[ino].refcnt++;
  
-    msg->param.pipe.fdo = fd;
+    q_init(&(itab[ino].msgs));
+    msg->pipe.fdo = fd;
 
-    msg->param.pipe.result = 0;
+    msg->pipe.result = 0;
     return;
 }
 
@@ -323,28 +331,32 @@ do_open (dm_task_t *client, dmmsg_t *msg) {
     int fd;
     int fp;
     int ino;
-    dirtab_t* dirent = dm_findbyname(msg->param.openclose.name);
-    if (!dirent) { /* name not found, error */ 
-        msg->param.openclose.fd = -1;
+
+    ino = find_empty_itab();    
+    if (ino < 0) {
+        msg->mknod.ino = -1;
         return;
     }
-    ino = dirent->ino;
+    itab[ino].dev = msg->openclose.dev;
+    itab[ino].num = msg->openclose.inum;
+    itab[ino].mode = getnode(itab[ino].dev, itab[ino].num);
     fp = find_empty_filp();
     if (fp < 0) {
-        msg->param.openclose.fd = -1;
+        msg->openclose.fd = -1;
         return;
     }
     fd = find_empty_fd(client);
     if (fd < 0) {
-        msg->param.openclose.fd = -1;
+        msg->openclose.fd = -1;
         return;
     }
     client->fd[fd] = fp;
     filp[fp].pos = 0;
     filp[fp].inode = ino;
     filp[fp].refcnt++;
-    itab[ino].refcnt++; 
-    msg->param.openclose.fd = fd;
+    itab[ino].refcnt++;
+    q_init(&(itab[ino].msgs));
+    msg->openclose.fd = fd;
     return;
 }
 
@@ -356,7 +368,7 @@ static void
 do_close (dm_task_t *client, dmmsg_t *msg) {
     int fp;
     int ino;
-    int fd = msg->param.openclose.fd;
+    int fd = msg->openclose.fd;
     dmmsg_t* msg_p; /* Temporary pointer */
     
 
@@ -378,23 +390,18 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
          * hence sending EOF to waiting clients */
         while(!Q_EMPTY(itab[ino].msgs)) {
             msg_p = (dmmsg_t*) Q_FIRST(itab[ino].msgs);
-            msg_p->param.rwc.data = EOF;
+            msg_p->rw.data = EOF;
             send(msg_p->client, msg_p);
             kfree(Q_REMV(&(itab[ino].msgs), msg_p));
         }
     }
-    if ((--(itab[ino].refcnt)) ||
-            itab[ino].links) {
-        return; /* refcnt || link cnt not zero yet */
-    }
 
-    if (itab[ino].mode == S_IFIFO) {
-        /* Both ends closed, remove node */
-        ;
-    } else {
-        msg->cmd = DM_RMNOD;
-        sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));
+    if (--(itab[ino].refcnt)) {
+        return; /* refcnt not zero yet */
     }
+    
+    putnode(itab[ino].dev, itab[ino].num);
+
     return;
 }
 
@@ -404,34 +411,22 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
 
 static void
 do_rw (dm_task_t *client, dmmsg_t *msg) {
-    int fd = msg->param.rwc.fd;
+    int fd = msg->rw.fd;
     int ino;
     dmmsg_t* msg_p; /* Temporary pointer */
 
     if ((fd < 0) || (client->fd[fd] < 0)) {
-        msg->param.rwc.data = EOF; /* wrong fd */
+        msg->rw.data = EOF; /* wrong fd */
         return;
     }
     ino = filp[client->fd[fd]].inode;
+    msg->rw.inum = itab[ino].num; /* no need for FD from this point */
 
     switch (itab[ino].mode) {
       case S_IFREG:
-        msg->param.rwc.pos = filp[client->fd[fd]].pos;
-        
-        switch (msg->cmd) {
-          case DM_WRITEC:
-            filp[client->fd[fd]].pos++; /* Assumption: no error during r/w */
-            itab[ino].size = filp[client->fd[fd]].pos;
-            break;
-          case DM_READC:
-            if (filp[client->fd[fd]].pos >= itab[ino].size) {
-                msg->param.rwc.data = EOF; /* reached end of file */
-                return;
-            }
-            filp[client->fd[fd]].pos++; /* Assumption: no error during r/w */
-            break;
-        }
-        sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));        
+        msg->rw.pos = filp[client->fd[fd]].pos;
+        sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));  
+        filp[client->fd[fd]].pos += msg->rw.bnum;
         break;
 
       case S_IFCHR:
@@ -442,7 +437,7 @@ do_rw (dm_task_t *client, dmmsg_t *msg) {
         if (Q_EMPTY(itab[ino].msgs)) {   /* Empty pipe */
             if (itab[ino].refcnt <= 1) {
                 /* Other end detached, send EOF */
-                msg->param.rwc.data = EOF;
+                msg->rw.data = EOF;
             } else {
                 /* FIFO empty, save request */
                 msg_p = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
@@ -461,10 +456,10 @@ do_rw (dm_task_t *client, dmmsg_t *msg) {
             } else {
                 switch (msg_p->cmd) {
                   case DM_READC:
-                    msg_p->param.rwc.data = msg->param.rwc.data;
+                    msg_p->rw.data = msg->rw.data;
                     break;
                   case DM_WRITEC:
-                    msg->param.rwc.data = msg_p->param.rwc.data;
+                    msg->rw.data = msg_p->rw.data;
                     break;
                 }
                 /* release waiting task */
@@ -501,12 +496,12 @@ dm_findbypid (pid_t pid) {
 static dm_task_t*
 dm_removetask (dmmsg_t *msg) {
     int i;
-    dm_task_t* pt = dm_findbypid(msg->param.adddel.pid);
+    dm_task_t* pt = dm_findbypid(msg->adddel.pid);
     if (!pt) {
         return NULL;
     }
     for (i=0; i < MAX_FD; i++) {
-        msg->param.openclose.fd = i;
+        msg->openclose.fd = i;
         do_close(pt, msg);
     }
     kfree(Q_REMV(&dm_task_q, pt));
@@ -525,23 +520,23 @@ dm_addnewtask (dmmsg_t *msg) {
     int i;
     pt = (dm_task_t*) kmalloc(sizeof(dm_task_t));
     if (!pt) {
-        msg->param.adddel.pid = NULL;
+        msg->adddel.pid = NULL;
         return;
     }
     memset(pt, 0x00, sizeof(dm_task_t));
     Q_END(&dm_task_q, pt);
-    pt->pid = msg->param.adddel.pid;
+    pt->pid = msg->adddel.pid;
     for (i=0; i < MAX_FD; i++) {
         pt->fd[i] = (-1);
     }
-    if (!msg->param.adddel.parent) {
+    if (!msg->adddel.parent) {
         return;  /* no parent, we're done */
     }
-    parent = dm_findbypid(msg->param.adddel.parent);
+    parent = dm_findbypid(msg->adddel.parent);
     if (!parent) {
         /* Parent not found, ERROR */
         dm_removetask(msg);
-        msg->param.adddel.pid = NULL;
+        msg->adddel.pid = NULL;
         return;
     }
     for (i=0; i < MAX_FD; i++) {
@@ -601,6 +596,7 @@ dm (void) {
             break;
 
           case DM_OPEN:
+          case DM_OPENI:
             do_open(dm_client, &msg);
             break;
 
@@ -648,11 +644,11 @@ setdmpid (pid_t pid) {
 int
 writec (int fd, int c) {
     dmmsg_t msg;
-    msg.param.rwc.fd = fd;
-    msg.param.rwc.data = c;
+    msg.rw.fd = fd;
+    msg.rw.data = c;
     msg.cmd = DM_WRITEC;
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.rwc.data);
+    return (msg.rw.data);
 }
 
 /*
@@ -662,10 +658,10 @@ writec (int fd, int c) {
 int
 readc (int fd) {
     dmmsg_t msg;
-    msg.param.rwc.fd = fd;
+    msg.rw.fd = fd;
     msg.cmd = DM_READC;
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.rwc.data);
+    return (msg.rw.data);
 }
 
 /*
@@ -676,10 +672,10 @@ pid_t
 dm_addtask (pid_t pid, pid_t parent) {
     dmmsg_t msg;
     msg.cmd = DM_ADDTASK;
-    msg.param.adddel.pid = pid;
-    msg.param.adddel.parent = parent;
+    msg.adddel.pid = pid;
+    msg.adddel.parent = parent;
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.adddel.pid);
+    return (msg.adddel.pid);
 }
 
 /*
@@ -690,7 +686,7 @@ void
 dm_deletetask (pid_t pid) {
     dmmsg_t msg;
     msg.cmd = DM_DELTASK;
-    msg.param.adddel.pid = pid;
+    msg.adddel.pid = pid;
     sendrec(dmtask, &msg, sizeof(msg));
     return;
 }
@@ -703,9 +699,9 @@ int
 mkdev (void(*p)(void)) {
     dmmsg_t msg;
     msg.cmd = DM_MKDEV;
-    msg.param.mkdev.ask.driver = p;
+    msg.mkdev.ask.driver = p;
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.mkdev.ans.id);
+    return (msg.mkdev.ans.id);
 }
 
 /*
@@ -716,11 +712,11 @@ int
 mknod (int dev, char* name, mode_t mode) {
     dmmsg_t msg;
     msg.cmd = DM_MKNOD;
-    msg.param.mknod.id = dev;
-    msg.param.mknod.mode = mode;
-    msg.param.mknod.name = name;
+    msg.mknod.id = dev;
+    msg.mknod.mode = mode;
+    msg.mknod.name = name;
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.mknod.ino);
+    return (msg.mknod.ino);
 }
 
 
@@ -729,9 +725,9 @@ pipe (int pipefd[2]) {
     dmmsg_t msg;
     msg.cmd = DM_PIPE;
     sendrec(dmtask, &msg, sizeof(msg));
-    pipefd[0] = msg.param.pipe.fdi;
-    pipefd[1] = msg.param.pipe.fdo;
-    return (msg.param.pipe.result);
+    pipefd[0] = msg.pipe.fdi;
+    pipefd[1] = msg.pipe.fdo;
+    return (msg.pipe.result);
 }
 /* 
  *
@@ -741,10 +737,10 @@ int
 fstat (char *name, struct stat *st_stat) {
     dmmsg_t msg;
     msg.cmd = DM_STAT;
-    msg.param.stat.ask.name = name;
+    msg.stat.ask.name = name;
     sendrec(dmtask, &msg, sizeof(msg));    
-    memcpy(st_stat, &msg.param.stat.ans.st_stat, sizeof(struct stat));
-    return (msg.param.stat.ans.code);
+    memcpy(st_stat, &msg.stat.ans.st_stat, sizeof(struct stat));
+    return (msg.stat.ans.code);
 }
 
 /* 
@@ -754,10 +750,20 @@ fstat (char *name, struct stat *st_stat) {
 int
 open (char *name) {
     dmmsg_t msg;
-    msg.cmd = DM_OPEN;
-    msg.param.openclose.name = name;
+    int i;
+
+    for(i=0; name[i]; i++) {
+        if (name[i] == '/') {
+            name[i] = '\0';
+            i++;
+            break;
+        }
+    }
+    msg.cmd = DM_OPENI;
+    msg.openclose.dev = atoi(name);
+    msg.openclose.inum = atoi(&(name[i]));
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.openclose.fd);
+    return (msg.openclose.fd);
 }
 
 /* 
@@ -768,7 +774,7 @@ void
 close (int fd) {
     dmmsg_t msg;
     msg.cmd = DM_CLOSE;
-    msg.param.openclose.fd = fd;
+    msg.openclose.fd = fd;
     sendrec(dmtask, &msg, sizeof(msg));
     return;
 }
@@ -781,7 +787,7 @@ int
 dup (int fd) {
     dmmsg_t msg;
     msg.cmd = DM_DUP;
-    msg.param.dup.fd = fd;
+    msg.dup.fd = fd;
     sendrec(dmtask, &msg, sizeof(msg));
-    return (msg.param.dup.fd);
+    return (msg.dup.fd);
 }

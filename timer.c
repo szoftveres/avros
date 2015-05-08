@@ -47,22 +47,16 @@ typedef struct delay_s {
 } delay_t;
 
 /*
- * TIMER CALL PARAMS
- */
-
-typedef union tmr_param_u {
-    delay_t         delay;          /* delay */
-    time_t          uptime;         /* uptime */
-    time_t          globtime;       /* global time */
-} tmr_param_t;
-
-/*
  *
  */
 
 typedef struct tmrmsg_s {
     int             cmd;
-    tmr_param_t     param;
+    union {
+        delay_t         delay;          /* delay */
+        time_t          uptime;         /* uptime */
+        time_t          globtime;       /* global time */
+    };
 } tmrmsg_t;
 
 
@@ -167,8 +161,8 @@ timer (void) {
         switch (msg.cmd) {
 
           case TMR_DELAY:
-            if (msg.param.delay.ticks) {
-                addtmrwait(client, msg.param.delay.ticks);
+            if (msg.delay.ticks) {
+                addtmrwait(client, msg.delay.ticks);
                 continue;
             }
             break;
@@ -185,15 +179,15 @@ timer (void) {
             break;
 
           case TMR_GET_UPTIME:
-            memcpy(&(msg.param.uptime), &uptime, sizeof(time_t));
+            memcpy(&(msg.uptime), &uptime, sizeof(time_t));
             break;
 
           case TMR_SET_GLOBTIME:
-            memcpy(&globtime, &(msg.param.globtime), sizeof(time_t));
+            memcpy(&globtime, &(msg.globtime), sizeof(time_t));
             break;
 
           case TMR_GET_GLOBTIME:
-            memcpy(&(msg.param.globtime), &globtime, sizeof(time_t));
+            memcpy(&(msg.globtime), &globtime, sizeof(time_t));
             break;
 
         }
@@ -225,7 +219,7 @@ void
 delay (int ticks) {
     tmrmsg_t msg;
     msg.cmd = TMR_DELAY;
-    msg.param.delay.ticks = ticks;
+    msg.delay.ticks = ticks;
     sendrec(timertask, &msg, sizeof(msg));
     return;
 }
@@ -239,7 +233,7 @@ getuptime (time_t* time) {
     tmrmsg_t msg;
     msg.cmd = TMR_GET_UPTIME;
     sendrec(timertask, &msg, sizeof(msg));
-    memcpy(time, &(msg.param.uptime), sizeof(time_t));
+    memcpy(time, &(msg.uptime), sizeof(time_t));
     return;
 }
 
@@ -252,7 +246,7 @@ gettime (time_t* time) {
     tmrmsg_t msg;
     msg.cmd = TMR_GET_GLOBTIME;
     sendrec(timertask, &msg, sizeof(msg));
-    memcpy(time, &(msg.param.globtime), sizeof(time_t));
+    memcpy(time, &(msg.globtime), sizeof(time_t));
     return;
 }
 
@@ -264,7 +258,7 @@ void
 settime (time_t* time) {
     tmrmsg_t msg;
     msg.cmd = TMR_SET_GLOBTIME;
-    memcpy(&(msg.param.uptime), time, sizeof(time_t));
+    memcpy(&(msg.uptime), time, sizeof(time_t));
     sendrec(timertask, &msg, sizeof(msg));    
     return;
 }

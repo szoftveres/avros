@@ -367,4 +367,47 @@ grep (char** argv) {
     return (c);
 }
 
+/*
+================================================================================
+*/
 
+/*
+ *          [name]  [dev num]  [mode p:pipe  r:regular]
+ * 
+ *  $ mknod mf1 3 r
+ *  $ mknod fifo 0 p
+ */
+
+int
+f_mknod (char** argv) {
+
+    mode_t mode;
+    int     inum;
+
+    if (argc(argv) < 4) {
+        noargs(argv);
+        return (-1);
+    }
+
+    switch (argv[3][0]) {
+      case 'r':
+        mode = S_IFREG;
+        break;
+      case 'p':
+        mode = S_IFIFO;
+        break;
+      case 'c':
+        mode = S_IFCHR;
+        break;
+      default:
+        unknown(argv, argv[3]);
+        return (-1);
+    }
+    if (argv[3][1]) {
+        unknown(argv, argv[3]);
+        return (-1);
+    }
+    inum = mknod(atoi(argv[2]), argv[1], mode);
+    mfprintf(1, " %d/%d\n", atoi(argv[2]), inum);
+    return (0);
+}

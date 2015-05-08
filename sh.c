@@ -76,7 +76,7 @@ exec_job (char** argv) {
     char* stin = NULL;
     char* stout = NULL;
     char** args = pmmalloc(sizeof(char*) * (MAX_ARGS + 1));
-
+    ASSERT(args);
     /* 
      * This is mandatory because shell keeps the other
      * end of the pipe and this process inherits it
@@ -86,6 +86,7 @@ exec_job (char** argv) {
     }
 
     cmd = pmmalloc(MAX_JOBLEN);
+    ASSERT(cmd);
     receive(TASK_ANY, cmd, MAX_JOBLEN);  
 
     parse_args(cmd, &stin, &stout, args);
@@ -131,8 +132,9 @@ exec_job (char** argv) {
 static int
 launch_job (char** argv) {
 	char *cmd = (char*) pmmalloc(MAX_JOBLEN);
+    ASSERT(cmd);
     receive(TASK_ANY, cmd, MAX_JOBLEN);
-    send(spawntask(exec_job, DEFAULT_STACK_SIZE, argv), cmd);
+    send(spawntask(exec_job, DEFAULT_STACK_SIZE+64, argv), cmd);
 	pmfree(cmd);
 	return (0);
 }
@@ -146,6 +148,8 @@ builtin (char* cmd) {
     char** args = pmmalloc(sizeof(char*) * (MAX_ARGS + 1));
     int rc = 0;
 
+    ASSERT(line);
+    ASSERT(args);
     strcpy(line, cmd);
     parse_args(line, NULL, NULL, args);
     
@@ -160,6 +164,7 @@ builtin (char* cmd) {
             noargs(args);
         } else {
             mfprintf(1,"cd %s\n", args[1]);
+            //chdir(args[1]);
         }
     }
 
@@ -174,11 +179,11 @@ builtin (char* cmd) {
 */
 
 static int
-getcmd (char* cmd, int len) {
+getcmd (int fin, char* cmd, int len) {
     int  c;
     int  i = 0;
     while (1) {
-        c = mgetc();
+        c = readc(fin);
         if (c == EOF) {
 			return c;
 		}
@@ -207,8 +212,9 @@ execute (char interactive, char direct, char* line, char** argv) {
         }
     }
     job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
+    ASSERT(job);
     strcpy(job, line);					/* filling with one section */
-    send(spawntask(direct ? exec_job: launch_job, DEFAULT_STACK_SIZE, argv), job);
+    send(spawntask(direct ? exec_job: launch_job, DEFAULT_STACK_SIZE+64, argv), job);
     pmfree(job);							/* deleting buffer */
     wait(&code);
     if (direct && interactive) {
@@ -257,29 +263,30 @@ sh (char** argv) {
     int pip[2];
     int nextin;
 	char *cmdline, *p, *jobstart;
-    char interactive = 1;
+    int fin = 0;
     
+    nextin = dup(0); /* 3 = stdin  */
+    dup(1);          /* 4 = stdout */
+    JOB_INIT
+
+    dup(0);          /* 5 needed by pipe */
     if (argv[1]) {
-        close(0);
-        if (open(argv[1]) < 0) {
+        if ((fin = open(argv[1])) < 0) {
             unknown(argv, argv[1]);
             return 1;
         }
-        interactive = 0;
+        ASSERT(fin == 6);
     }
-
-    nextin = dup(0); /* 2 = stdin  */
-    dup(1); /* 3 = stdout */
-    JOB_INIT
-
+    close(5);
 
     while (1) {
-        if (interactive) {
+        if (fin == 0) { /* interactive */
             mfprintf(1, "$ "); /* prompt */
         }
 		cmdline = (char*) pmmalloc(MAX_CMDLINE);
-        if (getcmd(cmdline, MAX_CMDLINE) == EOF) {
-            if (interactive) {
+        ASSERT(cmdline);
+        if (getcmd(fin, cmdline, MAX_CMDLINE) == EOF) {
+            if (fin == 0) {
                 mfprintf(1, "\nExit\n");
             }
 			mexit(0);
@@ -299,20 +306,20 @@ sh (char** argv) {
               case '|': /* pipe for future */
                 JOB_PIPE
                 *p++ = '\0'; 
-                execute(interactive, 0, jobstart, argv);
+                execute((fin == 0), 0, jobstart, argv);
                 jobstart = p; /**/
                 continue; /* pointer has been increased already */
               case '&': /* job section boundary */
                 JOB_NOPIPE
                 *p++ = '\0'; 
-                execute(interactive, 0, jobstart, argv);
+                execute((fin == 0), 0, jobstart, argv);
                 jobstart = p; /**/
                 JOB_INIT
                 continue; /* pointer has been increased already */
               case ';': /* command sequence boundary */
                 JOB_NOPIPE
                 *p++ = '\0'; 
-                code = execute(interactive, 1, jobstart, argv);
+                code = execute((fin == 0), 1, jobstart, argv);
                 jobstart = p; /**/
                 JOB_INIT
                 continue; /* pointer has been increased already */
@@ -321,7 +328,7 @@ sh (char** argv) {
 		}		
 		/* launching last job directly and waiting for it */
         JOB_NOPIPE
-        code = execute(interactive, 1, jobstart, argv);
+        code = execute((fin == 0), 1, jobstart, argv);
         code = code;
         pmfree(cmdline);
         JOB_INIT

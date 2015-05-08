@@ -37,11 +37,10 @@ startup (void) {
     setdmpid(pid);
 
     /* setting up devices/files */
-    mknod(mkdev(devnull), "null", S_IFCHR);
+    
+    mkdev(pipedev);
     mknod(mkdev(usart0), "usart0", S_IFCHR);
-    mknod(mkdev(memfile), "mf1", S_IFREG);
-    mknod(mkdev(memfile), "mf2", S_IFREG);
-    mknod(0, "npipe", S_IFIFO);
+    mkdev(memfile);
 
     /* starting executable store server */
     pid = addtask(TASK_PRIO_HIGH);
@@ -51,7 +50,7 @@ startup (void) {
     /* registering user programs */
     es_regprg("getty",      getty,          DEFAULT_STACK_SIZE);
     es_regprg("login",      login,          DEFAULT_STACK_SIZE);
-    es_regprg("sh",         sh,             DEFAULT_STACK_SIZE);
+    es_regprg("sh",         sh,             DEFAULT_STACK_SIZE+64);
     es_regprg("echo",       echo,           DEFAULT_STACK_SIZE);
     es_regprg("cat",        cat,            DEFAULT_STACK_SIZE);
     es_regprg("sleep",      sleep,          DEFAULT_STACK_SIZE);
@@ -60,6 +59,7 @@ startup (void) {
     es_regprg("repeat",     repeat,         DEFAULT_STACK_SIZE);
     es_regprg("uptime",     pr_uptime,      DEFAULT_STACK_SIZE);
     es_regprg("stat",       f_stat,         DEFAULT_STACK_SIZE);
+    es_regprg("mknod",      f_mknod,        DEFAULT_STACK_SIZE);
     es_regprg("grep",       grep,           DEFAULT_STACK_SIZE);
 
     /* starting process manager server */

@@ -25,7 +25,10 @@ int getopt (char* argv[], char* opts, getopt_p opt_p);
 
 void mfprintf (int fd, const char* fmt, ...);
 
-void unknown(char** argv, const char* s);
-void noargs(char** argv);
+void unknown (char** argv, const char* s);
+void noargs (char** argv);
+void massert (int val, char* file, int line);
+
+#define ASSERT(x) massert((int)x, __FILE__, __LINE__)
 
 #endif
