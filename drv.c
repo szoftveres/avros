@@ -119,7 +119,7 @@ void usart0 (void) {
 
           case DM_WRITEC:
             usart0_wr(msg.rw.data); 
-            break;  
+            break; 
         }
         send(client, &msg);
     }
@@ -185,41 +185,43 @@ void memfile (void) {
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch(msg.cmd){
-          case DM_ICREAT:
-            mode = msg.icreat.ask.mode;
-            msg.icreat.ans.num = mf_find_empty_node(nodes);
-            nodes[msg.icreat.ans.num] = (mfnode_t*) kmalloc(sizeof(mfnode_t));
-            nodes[msg.icreat.ans.num]->size = 0;
-            nodes[msg.icreat.ans.num]->refcnt = 0;
-            nodes[msg.icreat.ans.num]->links = 0;
-            nodes[msg.icreat.ans.num]->mode = mode;
+          case DM_MKNOD:
+            mode = msg.mknod.mode;
+            msg.mknod.ino = mf_find_empty_node(nodes);
+            nodes[msg.mknod.ino] = (mfnode_t*) kmalloc(sizeof(mfnode_t));
+            nodes[msg.mknod.ino]->size = 0;
+            nodes[msg.mknod.ino]->refcnt = 0;
+            nodes[msg.mknod.ino]->links = 0;
+            nodes[msg.mknod.ino]->mode = mode;
             break;
 
           case DM_LINK:
-            nodes[msg.link.ask.num]->links += 1;
+            nodes[msg.link.ask.ino]->links += 1;
             break;
           case DM_UNLINK:
-            nodes[msg.unlink.ask.num]->links -= 1;
-            if (nodes[msg.unlink.ask.num]->refcnt || nodes[msg.unlink.ask.num]->links) {
+            nodes[msg.unlink.ask.ino]->links -= 1;
+            if (nodes[msg.unlink.ask.ino]->refcnt || 
+                nodes[msg.unlink.ask.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.unlink.ask.num]);
-            nodes[msg.unlink.ask.num] = NULL;
+            kfree(nodes[msg.unlink.ask.ino]);
+            nodes[msg.unlink.ask.ino] = NULL;
             break;
 
           case DM_IGET:
-            nodes[msg.iget.ask.num]->refcnt += 1;
-            msg.iget.ans.mode = nodes[msg.iget.ask.num]->mode;
+            nodes[msg.iget.ask.ino]->refcnt += 1;
+            msg.iget.ans.mode = nodes[msg.iget.ask.ino]->mode;
             break;
           case DM_IPUT:
-            nodes[msg.iput.ask.num]->refcnt -= 1;
-            if (nodes[msg.iput.ask.num]->refcnt || nodes[msg.iput.ask.num]->links) {
+            nodes[msg.iput.ask.ino]->refcnt -= 1;
+            if (nodes[msg.iput.ask.ino]->refcnt || 
+                nodes[msg.iput.ask.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.iput.ask.num]);
-            nodes[msg.iput.ask.num] = NULL;
+            kfree(nodes[msg.iput.ask.ino]);
+            nodes[msg.iput.ask.ino] = NULL;
             break;
 
           case DM_WRITEC:
@@ -227,18 +229,19 @@ void memfile (void) {
                 msg.rw.data = EOF;
                 msg.rw.bnum = 0;
             } else {
-                nodes[msg.rw.inum]->size = msg.rw.pos;
-                nodes[msg.rw.inum]->file[msg.rw.pos] = (char) msg.rw.data;
+                nodes[msg.rw.ino]->size = msg.rw.pos;
+                nodes[msg.rw.ino]->file[msg.rw.pos] = (char) msg.rw.data;
                 msg.rw.bnum = 1;
-                nodes[msg.rw.inum]->size += msg.rw.bnum;
+                nodes[msg.rw.ino]->size += msg.rw.bnum;
             }
             break;
           case DM_READC:
-            if ((msg.rw.pos >= 127) || (msg.rw.pos >= nodes[msg.rw.inum]->size)) {
+            if ((msg.rw.pos >= 127) || 
+                (msg.rw.pos >= nodes[msg.rw.ino]->size)) {
                 msg.rw.data = EOF;
                 msg.rw.bnum = 0;
             } else {     
-                msg.rw.data = nodes[msg.rw.inum]->file[msg.rw.pos];
+                msg.rw.data = nodes[msg.rw.ino]->file[msg.rw.pos];
                 msg.rw.bnum = 1;
             }
             break;
@@ -282,41 +285,43 @@ void pipedev (void) {
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch (msg.cmd) {
-          case DM_ICREAT:
-            mode = msg.icreat.ask.mode;
-            msg.icreat.ans.num = pd_find_empty_node(nodes);
-            nodes[msg.icreat.ans.num] = (pdnode_t*)kmalloc(sizeof(pdnode_t));
-            nodes[msg.icreat.ans.num]->refcnt = 0;
-            nodes[msg.icreat.ans.num]->links = 0;
-            nodes[msg.icreat.ans.num]->mode = mode;
+          case DM_MKNOD:
+            mode = msg.mknod.mode;
+            msg.mknod.ino = pd_find_empty_node(nodes);
+            nodes[msg.mknod.ino] = (pdnode_t*)kmalloc(sizeof(pdnode_t));
+            nodes[msg.mknod.ino]->refcnt = 0;
+            nodes[msg.mknod.ino]->links = 0;
+            nodes[msg.mknod.ino]->mode = mode;
             break;
 
 
           case DM_LINK:
-            nodes[msg.link.ask.num]->links += 1;
+            nodes[msg.link.ask.ino]->links += 1;
             break;
           case DM_UNLINK:
-            nodes[msg.unlink.ask.num]->links -= 1;
-            if (nodes[msg.unlink.ask.num]->refcnt || nodes[msg.unlink.ask.num]->links) {
+            nodes[msg.unlink.ask.ino]->links -= 1;
+            if (nodes[msg.unlink.ask.ino]->refcnt || 
+                nodes[msg.unlink.ask.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.unlink.ask.num]);
-            nodes[msg.unlink.ask.num] = NULL;
+            kfree(nodes[msg.unlink.ask.ino]);
+            nodes[msg.unlink.ask.ino] = NULL;
             break;
 
           case DM_IGET:
-            nodes[msg.iget.ask.num]->refcnt += 1;
-            msg.iget.ans.mode = nodes[msg.iget.ask.num]->mode;
+            nodes[msg.iget.ask.ino]->refcnt += 1;
+            msg.iget.ans.mode = nodes[msg.iget.ask.ino]->mode;
             break;
           case DM_IPUT:
-            nodes[msg.iput.ask.num]->refcnt -= 1;
-            if (nodes[msg.iput.ask.num]->refcnt || nodes[msg.iput.ask.num]->links) {
+            nodes[msg.iput.ask.ino]->refcnt -= 1;
+            if (nodes[msg.iput.ask.ino]->refcnt || 
+                nodes[msg.iput.ask.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.iput.ask.num]);
-            nodes[msg.iput.ask.num] = NULL;
+            kfree(nodes[msg.iput.ask.ino]);
+            nodes[msg.iput.ask.ino] = NULL;
             break;
           case DM_WRITEC:
             msg.rw.data = EOF;
@@ -328,9 +333,6 @@ void pipedev (void) {
         send(client, &msg);
     }
 }
-
-
-
 
 /*
 ================================================================================

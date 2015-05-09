@@ -11,30 +11,30 @@ static pid_t            devtab[MAX_DEV];
 
 
 /*
- * INODE
+ * VNODE
  */
 
-typedef struct inode_s {
+typedef struct vnode_s {
     int                 dev;
-    int                 num;    /* inode number on device */
+    int                 ino;    /* inode number on device */
     char                refcnt;
     mode_t              mode;
     union {
         q_head_t            msgs;
     };
-} inode_t;
+} vnode_t;
 
 
 
 #define MAX_I           (12)
-static inode_t          itab[MAX_I];
+static vnode_t          itab[MAX_I];
 
 /*
  *  FILP
  */
 
 typedef struct filp_s {
-    int                 inode;
+    int                 vidx;
     char                refcnt;
     int                 pos;
 } filp_t;
@@ -95,6 +95,21 @@ find_empty_itab (void) {
     }
     return (-1);
 }
+
+
+static int
+find_open_itab (int dev, int ino) {
+    int i;
+    for (i=0; i < MAX_I; i++) {
+        if ((itab[i].refcnt) && 
+            (itab[i].dev == dev) &&
+            (itab[i].ino == ino)) {
+            return i;
+        }
+    }
+    return (-1);
+}
+
 
 /*
  *
@@ -183,65 +198,22 @@ do_mkdev (dmmsg_t *msg) {
  *
  */
 
-int
-createnode (int dev, mode_t mode) {
-    dmmsg_t msg;
-    msg.cmd = DM_ICREAT;
-    msg.icreat.ask.mode = mode;
-    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
-    return msg.icreat.ans.num;
-}
-
-mode_t
-getnode (int dev, int num) {
-    dmmsg_t msg;
-    msg.cmd = DM_IGET;
-    msg.iget.ask.num = num;
-    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
-    return msg.iget.ans.mode;
-}
-
-void
-putnode (int dev, int num) {
-    dmmsg_t msg;
-    msg.cmd = DM_IPUT;
-    msg.iput.ask.num = num;
-    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
-    return;
-}
-
-
-void
-linknode (int dev, int num) {
-    dmmsg_t msg;
-    msg.cmd = DM_LINK;
-    msg.iget.ask.num = num;
-    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
-    return;
-}
-
-void
-unlinknode (int dev, int num) {
-    dmmsg_t msg;
-    msg.cmd = DM_LINK;
-    msg.iget.ask.num = num;
-    sendrec(devtab[dev], &msg, sizeof(dmmsg_t));
-    return;
-}
-
-/*
- *
- */
-
 static void
 do_mknod (dmmsg_t *msg) {
-    int inum;
+    int dev;
+    int ino;
 
-    inum = createnode(msg->mknod.id, msg->mknod.mode);
+    dev = msg->mknod.id; 
+    /* Create node on device */
+    sendrec(devtab[dev], msg, sizeof(dmmsg_t));
+    ino = msg->mknod.ino;
 
-    linknode(msg->mknod.id, inum);
+    /* Link the node */
+    msg->cmd = DM_LINK;
+    msg->iget.ask.ino = ino;
+    sendrec(devtab[dev], msg, sizeof(dmmsg_t));
 
-    msg->mknod.ino = inum;
+    msg->mknod.ino = ino;
     return;
 }
 
@@ -271,17 +243,29 @@ static void
 do_pipe (dm_task_t *client, dmmsg_t *msg) {
     int fd;
     int fp;
-    int ino;
-    ino = find_empty_itab();            
-    if (ino < 0) {
+    int vidx;
+    
+    vidx = find_empty_itab();            
+    if (vidx < 0) {
         msg->pipe.result = -1;
         return;
     }
 
-    itab[ino].dev = 0;
-    itab[ino].num = createnode(itab[ino].dev, S_IFIFO);  /* Assumption: device 0 is PIPE */
-    itab[ino].mode = getnode(0, itab[ino].num);
+    /* Assumption: device 0 is PIPE */
+    itab[vidx].dev = 0;
 
+    /* Create inode on device */
+    msg->cmd = DM_MKNOD;
+    msg->mknod.mode = S_IFIFO;
+    sendrec(devtab[itab[vidx].dev], msg, sizeof(dmmsg_t));
+    itab[vidx].ino = msg->mknod.ino;
+
+    /* Get this new node */
+    msg->cmd = DM_IGET; 
+    msg->iget.ask.ino = itab[vidx].ino;
+    sendrec(devtab[itab[vidx].dev], msg, sizeof(dmmsg_t));
+    itab[vidx].mode = msg->iget.ans.mode;
+    
     /* input */
     fp = find_empty_filp();
     if (fp < 0) {
@@ -294,9 +278,9 @@ do_pipe (dm_task_t *client, dmmsg_t *msg) {
         return;
     }
     client->fd[fd] = fp;
-    filp[fp].inode = ino;
+    filp[fp].vidx = vidx;
     filp[fp].refcnt++;
-    itab[ino].refcnt++; 
+    itab[vidx].refcnt++; 
     msg->pipe.fdi = fd;
 
     /* output */
@@ -311,11 +295,11 @@ do_pipe (dm_task_t *client, dmmsg_t *msg) {
         return;
     }
     client->fd[fd] = fp;
-    filp[fp].inode = ino;
+    filp[fp].vidx = vidx;
     filp[fp].refcnt++;
-    itab[ino].refcnt++;
+    itab[vidx].refcnt++;
  
-    q_init(&(itab[ino].msgs));
+    q_init(&(itab[vidx].msgs));
     msg->pipe.fdo = fd;
 
     msg->pipe.result = 0;
@@ -330,16 +314,26 @@ static void
 do_open (dm_task_t *client, dmmsg_t *msg) {
     int fd;
     int fp;
-    int ino;
+    int vidx;
 
-    ino = find_empty_itab();    
-    if (ino < 0) {
-        msg->mknod.ino = -1;
-        return;
+    vidx = find_open_itab(msg->openclose.dev, msg->openclose.ino);
+    /* Check if this node is already open */
+    if (vidx < 0) {
+        vidx = find_empty_itab();    
+        if (vidx < 0) {
+            msg->openclose.fd = -1;
+            return;
+        }
+        itab[vidx].dev = msg->openclose.dev;
+        itab[vidx].ino = msg->openclose.ino;
+
+        /* Get the node */
+        msg->cmd = DM_IGET;
+        msg->iget.ask.ino = itab[vidx].ino;
+        sendrec(devtab[itab[vidx].dev], msg, sizeof(dmmsg_t));
+        itab[vidx].mode = msg->iget.ans.mode;
     }
-    itab[ino].dev = msg->openclose.dev;
-    itab[ino].num = msg->openclose.inum;
-    itab[ino].mode = getnode(itab[ino].dev, itab[ino].num);
+
     fp = find_empty_filp();
     if (fp < 0) {
         msg->openclose.fd = -1;
@@ -352,10 +346,10 @@ do_open (dm_task_t *client, dmmsg_t *msg) {
     }
     client->fd[fd] = fp;
     filp[fp].pos = 0;
-    filp[fp].inode = ino;
+    filp[fp].vidx = vidx;
     filp[fp].refcnt++;
-    itab[ino].refcnt++;
-    q_init(&(itab[ino].msgs));
+    itab[vidx].refcnt++;
+    q_init(&(itab[vidx].msgs));
     msg->openclose.fd = fd;
     return;
 }
@@ -367,7 +361,7 @@ do_open (dm_task_t *client, dmmsg_t *msg) {
 static void
 do_close (dm_task_t *client, dmmsg_t *msg) {
     int fp;
-    int ino;
+    int vidx;
     int fd = msg->openclose.fd;
     dmmsg_t* msg_p; /* Temporary pointer */
     
@@ -379,28 +373,31 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
     if (fp < 0) {
         return; /* Nothing to close */
     }
-    ino = filp[fp].inode;
+    vidx = filp[fp].vidx;
     client->fd[fd] = (-1);
 
     if ((--(filp[fp].refcnt))) {
         return; /* refcnt not zero yet */
     }
-    if (itab[ino].mode == S_IFIFO) {
+    if (itab[vidx].mode == S_IFIFO) {
         /* One end of the pipe has closed,
          * hence sending EOF to waiting clients */
-        while(!Q_EMPTY(itab[ino].msgs)) {
-            msg_p = (dmmsg_t*) Q_FIRST(itab[ino].msgs);
+        while(!Q_EMPTY(itab[vidx].msgs)) {
+            msg_p = (dmmsg_t*) Q_FIRST(itab[vidx].msgs);
             msg_p->rw.data = EOF;
             send(msg_p->client, msg_p);
-            kfree(Q_REMV(&(itab[ino].msgs), msg_p));
+            kfree(Q_REMV(&(itab[vidx].msgs), msg_p));
         }
     }
 
-    if (--(itab[ino].refcnt)) {
+    if (--(itab[vidx].refcnt)) {
         return; /* refcnt not zero yet */
     }
-    
-    putnode(itab[ino].dev, itab[ino].num);
+
+    /* No more refs, close this node */
+    msg->cmd = DM_IPUT;
+    msg->iput.ask.ino = itab[vidx].ino;
+    sendrec(devtab[itab[vidx].dev], msg, sizeof(dmmsg_t));
 
     return;
 }
@@ -412,46 +409,47 @@ do_close (dm_task_t *client, dmmsg_t *msg) {
 static void
 do_rw (dm_task_t *client, dmmsg_t *msg) {
     int fd = msg->rw.fd;
-    int ino;
+    int vidx;
     dmmsg_t* msg_p; /* Temporary pointer */
 
     if ((fd < 0) || (client->fd[fd] < 0)) {
         msg->rw.data = EOF; /* wrong fd */
         return;
     }
-    ino = filp[client->fd[fd]].inode;
-    msg->rw.inum = itab[ino].num; /* no need for FD from this point */
+    vidx = filp[client->fd[fd]].vidx;
+    msg->rw.ino = itab[vidx].ino;
+    /* no need for FD from this point */
 
-    switch (itab[ino].mode) {
+    switch (itab[vidx].mode) {
       case S_IFREG:
         msg->rw.pos = filp[client->fd[fd]].pos;
-        sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));  
+        sendrec(devtab[itab[vidx].dev], msg, sizeof(dmmsg_t));  
         filp[client->fd[fd]].pos += msg->rw.bnum;
         break;
 
       case S_IFCHR:
-        sendrec(devtab[itab[ino].dev], msg, sizeof(dmmsg_t));
+        sendrec(devtab[itab[vidx].dev], msg, sizeof(dmmsg_t));
         break;
 
       case S_IFIFO:
-        if (Q_EMPTY(itab[ino].msgs)) {   /* Empty pipe */
-            if (itab[ino].refcnt <= 1) {
+        if (Q_EMPTY(itab[vidx].msgs)) {   /* Empty pipe */
+            if (itab[vidx].refcnt <= 1) {
                 /* Other end detached, send EOF */
                 msg->rw.data = EOF;
             } else {
                 /* FIFO empty, save request */
                 msg_p = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
                 memcpy(msg_p, msg, sizeof(dmmsg_t));
-                Q_END(&(itab[ino].msgs), msg_p);
+                Q_END(&(itab[vidx].msgs), msg_p);
                 msg->cmd = DM_DONTREPLY;
             }
         } else {        /* Read or Write requests in the pipe */
-            msg_p = (dmmsg_t*) Q_FIRST(itab[ino].msgs);
+            msg_p = (dmmsg_t*) Q_FIRST(itab[vidx].msgs);
             if (msg_p->cmd == msg->cmd) {
                 /* Same request type, save it */
                 msg_p = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
                 memcpy(msg_p, msg, sizeof(dmmsg_t));
-                Q_END(&(itab[ino].msgs), msg_p);
+                Q_END(&(itab[vidx].msgs), msg_p);
                 msg->cmd = DM_DONTREPLY;
             } else {
                 switch (msg_p->cmd) {
@@ -464,7 +462,7 @@ do_rw (dm_task_t *client, dmmsg_t *msg) {
                 }
                 /* release waiting task */
                 send(msg_p->client, msg_p);
-                kfree(Q_REMV(&(itab[ino].msgs), msg_p));
+                kfree(Q_REMV(&(itab[vidx].msgs), msg_p));
             }
         }
         break;
@@ -596,7 +594,6 @@ dm (void) {
             break;
 
           case DM_OPEN:
-          case DM_OPENI:
             do_open(dm_client, &msg);
             break;
 
@@ -759,9 +756,9 @@ open (char *name) {
             break;
         }
     }
-    msg.cmd = DM_OPENI;
+    msg.cmd = DM_OPEN;
     msg.openclose.dev = atoi(name);
-    msg.openclose.inum = atoi(&(name[i]));
+    msg.openclose.ino = atoi(&(name[i]));
     sendrec(dmtask, &msg, sizeof(msg));
     return (msg.openclose.fd);
 }

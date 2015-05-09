@@ -6,9 +6,11 @@
 
 
 typedef enum mode_s {
-    S_IFREG,
-    S_IFCHR,
-    S_IFIFO
+    S_IFREG,    /* Regular */
+    S_IFCHR,    /* Character Special */
+    S_IFIFO,    /* FIFO Special */
+//    S_IFDIR,    /* Directory */
+//    S_IFMNT,    /* Mount point */
 } mode_t;
 
 
@@ -31,7 +33,6 @@ enum {
 
     DM_IGET,
     DM_IPUT,
-    DM_ICREAT,
 
     DM_LINK,
     DM_UNLINK,
@@ -40,12 +41,11 @@ enum {
     DM_PIPE,
 
     DM_OPEN,
-    DM_OPENI,
     DM_CLOSE,
     DM_CREAT,
 
-    DM_READC,                    /* char read */
-    DM_WRITEC,                    /* char write */
+    DM_READC,                  /* char read */
+    DM_WRITEC,                 /* char write */
 
     DM_ADDTASK,                /* Add taks */
     DM_DELTASK                 /* Del task */
@@ -82,7 +82,7 @@ typedef struct adddel_s {
 typedef struct rwc_s {
     union {
         int             fd;
-        int             inum;
+        int             ino;
     };
     union {
         int             pos;
@@ -101,7 +101,7 @@ typedef struct openclose_s {
             char*           name;         /* fname */
             struct {
                 int     dev;
-                int     inum;
+                int     ino;
             };
         };
         int             fd;         /* fd */
@@ -183,7 +183,7 @@ typedef struct dup_s {
  */
 typedef union iget_u {
     struct {
-        int     num;
+        int     ino;
     } ask;
     struct {
         mode_t     mode;
@@ -192,29 +192,20 @@ typedef union iget_u {
 
 typedef union iput_u {
     struct {
-        int     num;
+        int     ino;
     } ask;
 } iput_t;
-
-typedef union icreat_u {
-    struct {
-        mode_t  mode;
-    } ask;
-    struct {
-        int     num;
-    } ans;
-} icreat_t;
 
 
 typedef union link_u {
     struct {
-        int     num;
+        int     ino;
     } ask;
 } link_t;
 
 typedef union unlink_u {
     struct {
-        int     num;
+        int     ino;
     } ask;
 } unlink_t;
 
@@ -238,7 +229,6 @@ typedef struct dmmsg_s {
         adddel_t        adddel;        /* Client add del*/
         iget_t          iget;
         iput_t          iput;
-        icreat_t        icreat;
         link_t          link;
         unlink_t        unlink;
     };
