@@ -5,7 +5,7 @@
 #include "sema.h"
 #include "timer.h"
 #include "pm.h"
-#include "dm.h"  /* EOF */
+#include "vfs.h"  /* EOF */
 #include "es.h"
 
 /*

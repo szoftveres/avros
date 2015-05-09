@@ -37,7 +37,7 @@ HEX_EEPROM_FLAGS += --change-section-lma .eeprom=0 --no-change-warnings
 
 
 ## Objects that must be built in order to link
-OBJECTS = apps.o dm.o kernel.o main.o misc.o sh.o sys.o drv.o sema.o pm.o es.o init.o timer.o queue.o 
+OBJECTS = apps.o kernel.o main.o misc.o sh.o sys.o drv.o sema.o pm.o es.o init.o timer.o queue.o vfs.o 
 
 ## Objects explicitly added by the user
 LINKONLYOBJECTS = 
@@ -47,9 +47,6 @@ all: $(TARGET) os.hex os.eep os.lss size
 
 ## Compile
 apps.o: ../apps.c
-	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
-
-dm.o: ../dm.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 kernel.o: ../kernel.c
@@ -86,6 +83,9 @@ timer.o: ../timer.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 queue.o: ../queue.c
+	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
+
+vfs.o: ../vfs.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 ##Link

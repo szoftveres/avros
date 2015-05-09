@@ -1,6 +1,6 @@
 #include "kernel.h"
 
-#include "dm.h"
+#include "vfs.h"
 #include "drv.h"
 #include "sema.h"
 #include "timer.h"
@@ -33,8 +33,8 @@ startup (void) {
 
     /* starting device manager server */
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, dm, DEFAULT_STACK_SIZE * 2);
-    setdmpid(pid);
+    launchtask(pid, vfs, DEFAULT_STACK_SIZE * 2);
+    setvfspid(pid);
 
     /* setting up devices/files */
     

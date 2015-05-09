@@ -3,7 +3,7 @@
 #include <ctype.h>
 #include "kernel.h"
 #include "misc.h"
-#include "dm.h"
+#include "vfs.h"
 #include "pm.h"
 
 

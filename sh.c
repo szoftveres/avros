@@ -3,7 +3,7 @@
 #include "sh.h"
 #include "misc.h"
 #include "apps.h"
-#include "dm.h"
+#include "vfs.h"
 #include "pm.h"
 
 #include <string.h>

@@ -1,6 +1,6 @@
 #include "pm.h"
 #include "es.h"
-#include "dm.h"
+#include "vfs.h"
 #include "kernel.h"
 #include "queue.h"
 
@@ -436,7 +436,7 @@ do_reg (pmmsg_t* msg) {
     if(!Q_END(&task_q, pm_task)){
         return 0;   /* Sorry... */
     }
-    if(!dm_addtask(msg->reg.pid, NULL)){
+    if(!vfs_addtask(msg->reg.pid, NULL)){
         return 0;
     }
     return 1;
@@ -458,7 +458,7 @@ do_spawn (pmmsg_t* msg) {
     if (!Q_END(&task_q, pm_task)) {
         return;   /* Sorry... */
     }                
-    if (!dm_addtask(task, PM_PIDOF(PM_CLIENT))){
+    if (!vfs_addtask(task, PM_PIDOF(PM_CLIENT))){
         return;   /* Sorry... */
     }
     if (!push_cpucontext(pm_task, msg->spawn.ask.stack, 
@@ -503,7 +503,7 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
     q_forall(&(PM_CLIENT->chunk_q), pm_delchunks);
     stoptask(PM_PIDOF(PM_CLIENT));
     deletetask(PM_PIDOF(PM_CLIENT)); 
-    dm_deletetask(PM_CLIENT->pid);
+    vfs_deletetask(PM_CLIENT->pid);
 
     /* Deleting zombie children */
     q_forall(&zombie_q, pm_removechild);

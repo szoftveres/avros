@@ -1,6 +1,6 @@
 #include "kernel.h"
 #include "drv.h"
-#include "dm.h"
+#include "vfs.h"
 #include <avr/io.h>
 #include "queue.h"
 
@@ -15,7 +15,7 @@ void usart0_wr (int data) {
 }
 
 void usart0_event (void) {
-    dmmsg_t     msg;
+    vfsmsg_t     msg;
     pid_t       driver;
     pid_t       manager;
 
@@ -32,15 +32,15 @@ void usart0_event (void) {
           case EVENT_USART0RX:
             UCSR0B &= ~(1<<RXCIE0); /* Disable RXC interrupt */
             msg.interrupt.data = UDR0; /* this will clear RXC flag */
-            msg.interrupt.cmd = DM_READC;
+            msg.interrupt.cmd = VFS_READC;
             break;
           case EVENT_USART0TX:
             UCSR0B &= ~(1<<TXCIE0); /* Disable TXC interrupt */
             /* Executing the interrupt handler clears TXC flag automatically */
-            msg.interrupt.cmd = DM_WRITEC;
+            msg.interrupt.cmd = VFS_WRITEC;
             break;
         }
-        msg.cmd = DM_INTERRUPT;
+        msg.cmd = VFS_INTERRUPT;
         msg.client = driver;
         send(manager, &msg);
     }
@@ -52,10 +52,10 @@ void usart0_event (void) {
 
 void usart0 (void) {    
     pid_t client;
-    dmmsg_t msg;  
+    vfsmsg_t msg;  
     q_head_t rd_q;
     q_head_t wr_q;
-    dmmsg_t*  elem;
+    vfsmsg_t*  elem;
 
     q_init(&rd_q);
     q_init(&wr_q);
@@ -70,7 +70,7 @@ void usart0 (void) {
         
         switch(msg.cmd){
 
-          case DM_MKDEV: {
+          case VFS_MKDEV: {
                 pid_t       interrupt;
                 interrupt = addtask(TASK_PRIO_RT);
                 launchtask(interrupt, usart0_event, DEFAULT_STACK_SIZE);
@@ -78,46 +78,46 @@ void usart0 (void) {
                 sendrec(interrupt, &msg, sizeof(msg));
             }
             break;
-          case DM_IGET:
+          case VFS_IGET:
             msg.iget.ans.mode = S_IFCHR;
             break;
-          case DM_READC:
-            elem = (dmmsg_t*)(Q_FIRST(rd_q));
-            if (elem && elem->cmd == DM_INTERRUPT) {
+          case VFS_READC:
+            elem = (vfsmsg_t*)(Q_FIRST(rd_q));
+            if (elem && elem->cmd == VFS_INTERRUPT) {
                 msg.rw.data = elem->interrupt.data;
                 kfree(Q_REMV(&rd_q, elem));
             } else {
-                elem = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
                 memcpy(elem, &msg, sizeof(msg));
                 Q_END(&rd_q, elem);
-                msg.cmd = DM_DONTREPLY;
+                msg.cmd = VFS_DONTREPLY;
             }
             break;
           
-          case DM_INTERRUPT:
+          case VFS_INTERRUPT:
             switch (msg.interrupt.cmd) {
-              case DM_READC:
+              case VFS_READC:
                 if(msg.interrupt.data == 0x04){ /* Ctrl + D */
                     msg.interrupt.data = EOF;
                 }else{ 
                     usart0_wr(msg.interrupt.data); /* ECHO */
                 }
-                elem = (dmmsg_t*)(Q_FIRST(rd_q));
-                if (elem && elem->cmd == DM_READC) {
+                elem = (vfsmsg_t*)(Q_FIRST(rd_q));
+                if (elem && elem->cmd == VFS_READC) {
                     msg.client = elem->client;
                     msg.rw.data = msg.interrupt.data;
                     kfree(Q_REMV(&rd_q, elem));
                 } else {
-                    elem = (dmmsg_t*) kmalloc(sizeof(dmmsg_t));
+                    elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
                     memcpy(elem, &msg, sizeof(msg));
                     Q_END(&rd_q, elem);
-                    msg.cmd = DM_DONTREPLY;
+                    msg.cmd = VFS_DONTREPLY;
                 }
                 break;
             }
             break;
 
-          case DM_WRITEC:
+          case VFS_WRITEC:
             usart0_wr(msg.rw.data); 
             break; 
         }
@@ -178,14 +178,14 @@ mf_find_empty_node (mfnode_t** list) {
 
 void memfile (void) {
     pid_t client;
-    dmmsg_t msg;
+    vfsmsg_t msg;
     mode_t  mode;
     mfnode_t** nodes = (mfnode_t**)kmalloc(sizeof(mfnode_t*) * MF_MAX_NODES); 
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch(msg.cmd){
-          case DM_MKNOD:
+          case VFS_MKNOD:
             mode = msg.mknod.mode;
             msg.mknod.ino = mf_find_empty_node(nodes);
             nodes[msg.mknod.ino] = (mfnode_t*) kmalloc(sizeof(mfnode_t));
@@ -195,10 +195,10 @@ void memfile (void) {
             nodes[msg.mknod.ino]->mode = mode;
             break;
 
-          case DM_LINK:
+          case VFS_LINK:
             nodes[msg.link.ask.ino]->links += 1;
             break;
-          case DM_UNLINK:
+          case VFS_UNLINK:
             nodes[msg.unlink.ask.ino]->links -= 1;
             if (nodes[msg.unlink.ask.ino]->refcnt || 
                 nodes[msg.unlink.ask.ino]->links) {
@@ -209,11 +209,11 @@ void memfile (void) {
             nodes[msg.unlink.ask.ino] = NULL;
             break;
 
-          case DM_IGET:
+          case VFS_IGET:
             nodes[msg.iget.ask.ino]->refcnt += 1;
             msg.iget.ans.mode = nodes[msg.iget.ask.ino]->mode;
             break;
-          case DM_IPUT:
+          case VFS_IPUT:
             nodes[msg.iput.ask.ino]->refcnt -= 1;
             if (nodes[msg.iput.ask.ino]->refcnt || 
                 nodes[msg.iput.ask.ino]->links) {
@@ -224,7 +224,7 @@ void memfile (void) {
             nodes[msg.iput.ask.ino] = NULL;
             break;
 
-          case DM_WRITEC:
+          case VFS_WRITEC:
             if (msg.rw.pos >= 127) {
                 msg.rw.data = EOF;
                 msg.rw.bnum = 0;
@@ -235,7 +235,7 @@ void memfile (void) {
                 nodes[msg.rw.ino]->size += msg.rw.bnum;
             }
             break;
-          case DM_READC:
+          case VFS_READC:
             if ((msg.rw.pos >= 127) || 
                 (msg.rw.pos >= nodes[msg.rw.ino]->size)) {
                 msg.rw.data = EOF;
@@ -276,7 +276,7 @@ pd_find_empty_node (pdnode_t** list) {
 
 void pipedev (void) {
     pid_t client;
-    dmmsg_t msg;
+    vfsmsg_t msg;
     mode_t mode;
     pdnode_t** nodes = (pdnode_t**)kmalloc(sizeof(pdnode_t*) * PD_MAX_NODES);
     
@@ -285,7 +285,7 @@ void pipedev (void) {
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch (msg.cmd) {
-          case DM_MKNOD:
+          case VFS_MKNOD:
             mode = msg.mknod.mode;
             msg.mknod.ino = pd_find_empty_node(nodes);
             nodes[msg.mknod.ino] = (pdnode_t*)kmalloc(sizeof(pdnode_t));
@@ -295,10 +295,10 @@ void pipedev (void) {
             break;
 
 
-          case DM_LINK:
+          case VFS_LINK:
             nodes[msg.link.ask.ino]->links += 1;
             break;
-          case DM_UNLINK:
+          case VFS_UNLINK:
             nodes[msg.unlink.ask.ino]->links -= 1;
             if (nodes[msg.unlink.ask.ino]->refcnt || 
                 nodes[msg.unlink.ask.ino]->links) {
@@ -309,11 +309,11 @@ void pipedev (void) {
             nodes[msg.unlink.ask.ino] = NULL;
             break;
 
-          case DM_IGET:
+          case VFS_IGET:
             nodes[msg.iget.ask.ino]->refcnt += 1;
             msg.iget.ans.mode = nodes[msg.iget.ask.ino]->mode;
             break;
-          case DM_IPUT:
+          case VFS_IPUT:
             nodes[msg.iput.ask.ino]->refcnt -= 1;
             if (nodes[msg.iput.ask.ino]->refcnt || 
                 nodes[msg.iput.ask.ino]->links) {
@@ -323,10 +323,10 @@ void pipedev (void) {
             kfree(nodes[msg.iput.ask.ino]);
             nodes[msg.iput.ask.ino] = NULL;
             break;
-          case DM_WRITEC:
+          case VFS_WRITEC:
             msg.rw.data = EOF;
             break;
-          case DM_READC:
+          case VFS_READC:
             msg.rw.data = EOF;
             break;
         }

@@ -1,5 +1,5 @@
-#ifndef _DM_H_
-#define _DM_H_
+#ifndef _VFS_H_
+#define _VFS_H_
 
 #include "queue.h"
 
@@ -17,38 +17,38 @@ typedef enum mode_s {
 #define MAX_FD          (8)
 
 enum {   
-    DM_NONE,
-    DM_INTERRUPT,
-    DM_DONTREPLY,
+    VFS_NONE,
+    VFS_INTERRUPT,
+    VFS_DONTREPLY,
 
-    DM_STAT,
+    VFS_STAT,
 
-    DM_MKDEV,
+    VFS_MKDEV,
 
-    DM_MKNOD,
-    DM_RMNOD,
+    VFS_MKNOD,
+    VFS_RMNOD,
 
-    DM_DUP,
+    VFS_DUP,
 
 
-    DM_IGET,
-    DM_IPUT,
+    VFS_IGET,
+    VFS_IPUT,
 
-    DM_LINK,
-    DM_UNLINK,
+    VFS_LINK,
+    VFS_UNLINK,
     
 
-    DM_PIPE,
+    VFS_PIPE,
 
-    DM_OPEN,
-    DM_CLOSE,
-    DM_CREAT,
+    VFS_OPEN,
+    VFS_CLOSE,
+    VFS_CREAT,
 
-    DM_READC,                  /* char read */
-    DM_WRITEC,                 /* char write */
+    VFS_READC,                  /* char read */
+    VFS_WRITEC,                 /* char write */
 
-    DM_ADDTASK,                /* Add taks */
-    DM_DELTASK                 /* Del task */
+    VFS_ADDTASK,                /* Add taks */
+    VFS_DELTASK                 /* Del task */
 };
 
 /*
@@ -213,7 +213,7 @@ typedef union unlink_u {
  * MESSAGE
  */
 
-typedef struct dmmsg_s {
+typedef struct vfsmsg_s {
     QUEUE_HEADER;
     int             cmd;        /* command */
     pid_t           client;     /* client (client who requests IO) */
@@ -232,18 +232,16 @@ typedef struct dmmsg_s {
         link_t          link;
         unlink_t        unlink;
     };
-} dmmsg_t;
+} vfsmsg_t;
 
 /*
  *
  */
 
 
-void dm (void);
+void vfs (void);
 
-pid_t setdmpid (pid_t pid);
-
-
+pid_t setvfspid (pid_t pid);
 
 
 
@@ -251,8 +249,10 @@ pid_t setdmpid (pid_t pid);
 
 
 
-pid_t dm_addtask (pid_t pid, pid_t parent);
-void dm_deletetask (pid_t pid);
+
+
+pid_t vfs_addtask (pid_t pid, pid_t parent);
+void vfs_deletetask (pid_t pid);
 int mkdev (void(*p)(void));
 int mknod (int dev, char* name, mode_t mode);
 int pipe(int pipefd[2]);
