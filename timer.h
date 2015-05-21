@@ -10,7 +10,7 @@ typedef struct time_s {
 } time_t;
 
 
-void timer (void);
+void timer (void* args);
 pid_t settimerpid (pid_t pid);
 
 void delay (int ticks);

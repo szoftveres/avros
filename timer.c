@@ -97,7 +97,7 @@ tmr_managedelay (q_head_t* que, q_item_t* w) {
  */
 
 static void
-timerworker (void) {
+timerworker (void* args UNUSED) {
     tmrmsg_t msg;
     msg.cmd = TMR_NONE;
     pid_t tm = receive(TASK_ANY, NULL, 0);
@@ -146,14 +146,14 @@ timer_init (void) {
  */
 
 void
-timer (void) {
+timer (void* args UNUSED) {
     pid_t           client;
     tmrmsg_t        msg;
         
     timer_init();
 
     client = addtask(TASK_PRIO_RT);
-    launchtask(client, timerworker, DEFAULT_STACK_SIZE);
+    launchtask(client, timerworker, NULL, DEFAULT_STACK_SIZE);
     send(client, NULL);
 
     while (1) {

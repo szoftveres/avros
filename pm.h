@@ -9,7 +9,7 @@
 
 
 
-void pm(void);
+void pm (void* args);
 
 pid_t setpmpid (pid_t pid);
 

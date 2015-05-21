@@ -185,7 +185,7 @@ do_mkdev (vfsmsg_t *msg) {
         return;
     }
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, msg->mkdev.ask.driver, DEFAULT_STACK_SIZE);
+    launchtask(pid, msg->mkdev.ask.driver, msg->mkdev.ask.args, DEFAULT_STACK_SIZE);
     devtab[i] = pid;
 
     msg->cmd = VFS_MKDEV;
@@ -551,7 +551,7 @@ vfs_addnewtask (vfsmsg_t *msg) {
  */
 
 void
-vfs (void) {
+vfs (void* args UNUSED) {
     pid_t client;
     vfs_task_t *vfs_client;
     vfsmsg_t msg;
@@ -693,10 +693,11 @@ vfs_deletetask (pid_t pid) {
  */
 
 int
-mkdev (void(*p)(void)) {
+mkdev (void(*p)(void* args), void* args) {
     vfsmsg_t msg;
     msg.cmd = VFS_MKDEV;
     msg.mkdev.ask.driver = p;
+    msg.mkdev.ask.args = args;
     sendrec(vfstask, &msg, sizeof(msg));
     return (msg.mkdev.ans.id);
 }

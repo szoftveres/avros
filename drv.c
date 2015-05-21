@@ -14,7 +14,7 @@ void usart0_wr (int data) {
     UDR0 = (unsigned char) data;
 }
 
-void usart0_event (void) {
+void usart0_event (void* args UNUSED) {
     vfsmsg_t     msg;
     pid_t       driver;
     pid_t       manager;
@@ -50,7 +50,7 @@ void usart0_event (void) {
  *
  */
 
-void usart0 (void) {    
+void usart0 (void* args) {
     pid_t client;
     vfsmsg_t msg;  
     q_head_t rd_q;
@@ -73,9 +73,10 @@ void usart0 (void) {
           case VFS_MKDEV: {
                 pid_t       interrupt;
                 interrupt = addtask(TASK_PRIO_RT);
-                launchtask(interrupt, usart0_event, DEFAULT_STACK_SIZE);
+                launchtask(interrupt, usart0_event, NULL, DEFAULT_STACK_SIZE);
                 msg.client = client;
                 sendrec(interrupt, &msg, sizeof(msg));
+                /*XXX*/dputs("\nUsart0 args: "); dputu((unsigned int)args); dputc('\n');/*XXX*/
             }
             break;
           case VFS_IGET:
@@ -176,7 +177,7 @@ mf_find_empty_node (mfnode_t** list) {
     return (-1);
 }
 
-void memfile (void) {
+void memfile (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
     mode_t  mode;
@@ -274,7 +275,7 @@ pd_find_empty_node (pdnode_t** list) {
     return (-1);
 }
 
-void pipedev (void) {
+void pipedev (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
     mode_t mode;

@@ -170,7 +170,7 @@ typedef struct semamsg_s {
  */
 
 void
-semasrv (void) {
+semasrv (void* args UNUSED) {
     pid_t client;
     semamsg_t msg;
     /* Do some cleanup before start */

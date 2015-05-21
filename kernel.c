@@ -75,7 +75,8 @@ typedef struct starttask_s {
 
 typedef struct launchtask_s {
     pid_t           pid;            /* pid */
-    void(*ptr)(void);               /* task entry */
+    void(*ptr)(void* args);          /* task entry */
+    void* args;                      /* task entry */
     size_t          stack;          /* stack size */
 } launchtask_t;
 
@@ -249,8 +250,8 @@ newtask (void)
  */
 
 static void
-idle_task (void) {
-    while(1) {
+idle_task (void* args UNUSED) {
+    while (1) {
         cpu_sleep();
     }
 }
@@ -270,7 +271,7 @@ k_stack_push (task_t* tp, char val) {
  */
 
 static char*
-k_build_initial_stack (task_t* newtask, void (*tp)(void), size_t stack) {
+k_build_initial_stack (task_t* newtask, void (*tp)(void* args), void* args, size_t stack) {
 
     cpu_context_t* ctxt;
     size_t real_size;
@@ -291,6 +292,8 @@ k_build_initial_stack (task_t* newtask, void (*tp)(void), size_t stack) {
     k_stack_push(newtask, HIGH(exittask));
 
     newtask->sp -= sizeof(cpu_context_t);
+    ctxt->r24 = LOW(args);
+    ctxt->r25 = HIGH(args);
     ctxt->retLow = LOW(tp);
     ctxt->retHigh = HIGH(tp);
     ctxt->r1 = 0;                                   /* GCC needs r1 to be 0x00 */
@@ -495,7 +498,7 @@ initidle (void) {
     if (!task) {
         return (NULL);
     }
-    if (!k_build_initial_stack(task, idle_task, 0x80)) {
+    if (!k_build_initial_stack(task, idle_task, NULL, 0x80)) {
         free(task);
         return (NULL);
     }
@@ -508,12 +511,12 @@ initidle (void) {
  */  
 
 static pid_t
-initusertask (void(*ptp)(void), size_t stack, unsigned char prio) {
+initusertask (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
     pid_t task = newtask();
     if(!task){
         return (NULL);
     }
-    if(!k_build_initial_stack(task, ptp, stack)){
+    if(!k_build_initial_stack(task, ptp, args, stack)){
         free(task);
         return (NULL);
     }
@@ -527,7 +530,7 @@ initusertask (void(*ptp)(void), size_t stack, unsigned char prio) {
  */ 
 
 void
-kernel (void(*ptp)(void), size_t stack, unsigned char prio) {
+kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
     pid_t       wtask;              /* task we work on */
     pid_t       old;
 
@@ -544,7 +547,7 @@ kernel (void(*ptp)(void), size_t stack, unsigned char prio) {
     }
     Q_END(&queue[wtask->prio], wtask); 
 
-    wtask = initusertask(ptp, stack, prio);
+    wtask = initusertask(ptp, args, stack, prio);
     if(!wtask){
         return;
     }
@@ -608,8 +611,10 @@ kernel (void(*ptp)(void), size_t stack, unsigned char prio) {
 
 		  case KRNL_LAUNCHTASK:     /* Start a task with built-in context */
 			wtask = CURRENT->kcall.launchtask.pid;
-			if(!k_build_initial_stack(wtask, CURRENT->kcall.launchtask.ptr, 
-                    CURRENT->kcall.launchtask.stack)){
+			if(!k_build_initial_stack(wtask,
+                                      CURRENT->kcall.launchtask.ptr, 
+                                      CURRENT->kcall.launchtask.args, 
+                                      CURRENT->kcall.launchtask.stack)){
 				continue; /* Sorry... */
 			}
             Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
@@ -862,9 +867,10 @@ pushstack (pid_t pid, char* ptr, size_t size) {
  */
 
 void
-launchtask (pid_t pid, void(*ptsk)(void), size_t stacksize) {
+launchtask (pid_t pid, void(*ptsk)(void* args), void* args, size_t stacksize) {
     CURRENT->kcall.launchtask.pid = pid;   
     CURRENT->kcall.launchtask.ptr = ptsk;
+    CURRENT->kcall.launchtask.args = args;
     CURRENT->kcall.launchtask.stack = stacksize;
     CURRENT->kcall.code = (KRNL_LAUNCHTASK);
     swtrap();

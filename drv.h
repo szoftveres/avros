@@ -2,8 +2,8 @@
 #define _DRV_H_
 
 
-void usart0 (void);
-void memfile (void);
-void pipedev (void);
+void usart0 (void* args);
+void memfile (void* args);
+void pipedev (void* args);
 
 #endif

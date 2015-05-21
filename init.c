@@ -28,7 +28,7 @@ launchsession (char** argv) {
  */
 
 void
-init (void) {
+init (void* args UNUSED) {
     char* session_arg[3];
     unsigned int i;
     pid_t pid;

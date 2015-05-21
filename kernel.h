@@ -41,7 +41,7 @@ typedef struct task_s* pid_t;
  *
  */
 
-void kernel(void(*ptp)(void), size_t stack, unsigned char prio);
+void kernel(void(*ptp)(void* args), void* args, size_t stack, unsigned char prio);
 
 /*
  *
@@ -81,7 +81,7 @@ void kirqen(void);
 
 void kirqdis(void);
 
-void launchtask(pid_t pid, void(*ptsk)(void), size_t stacksize);
+void launchtask(pid_t pid, void(*ptsk)(void* args), void* args, size_t stacksize);
 
 
 /*

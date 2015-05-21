@@ -18,12 +18,12 @@
  */
 
 void
-startup (void) {
+startup (void* args UNUSED) {
     pid_t pid;
 
     /* starting timer server */
     pid = addtask(TASK_PRIO_RT);
-    launchtask(pid, timer, DEFAULT_STACK_SIZE);
+    launchtask(pid, timer, NULL, DEFAULT_STACK_SIZE);
     settimerpid(pid);
 
     /* starting semaphore server */
@@ -33,18 +33,18 @@ startup (void) {
 
     /* starting device manager server */
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, vfs, DEFAULT_STACK_SIZE * 2);
+    launchtask(pid, vfs, NULL, DEFAULT_STACK_SIZE * 2);
     setvfspid(pid);
 
     /* setting up devices/files */
     
-    mkdev(pipedev);
-    mknod(mkdev(usart0), "usart0", S_IFCHR);
-    mkdev(memfile);
+    mkdev(pipedev, NULL);
+    mknod(mkdev(usart0, (void*)12345), "usart0", S_IFCHR);
+    mkdev(memfile, NULL);
 
     /* starting executable store server */
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, es, DEFAULT_STACK_SIZE);
+    launchtask(pid, es, NULL, DEFAULT_STACK_SIZE);
     setespid(pid);
 
     /* registering user programs */
@@ -64,13 +64,13 @@ startup (void) {
 
     /* starting process manager server */
     pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, pm, DEFAULT_STACK_SIZE * 2);
+    launchtask(pid, pm, NULL, DEFAULT_STACK_SIZE * 2);
     setpmpid(pid);
 
     /* launching init */
     pid = addtask(TASK_PRIO_DFLT);
     pmreg(pid); /* This does FS registration as well */
-    launchtask(pid, init, DEFAULT_STACK_SIZE);     
+    launchtask(pid, init, NULL, DEFAULT_STACK_SIZE);     
 
     /* done, exiting */
     return;
@@ -81,7 +81,7 @@ startup (void) {
  */
 
 int main (void) {
-    kernel(startup, DEFAULT_STACK_SIZE, TASK_PRIO_DFLT);
+    kernel(startup, NULL, DEFAULT_STACK_SIZE, TASK_PRIO_DFLT);
     return 0;
 }
 

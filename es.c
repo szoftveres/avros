@@ -133,7 +133,7 @@ es_get_prg (char* name, int(**ptr)(char**), size_t *stack) {
 */
 
 void
-es (void) {
+es (void* args UNUSED) {
     pid_t msg_client;
     es_msg_t        msg;
     es_init_prg();

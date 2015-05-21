@@ -129,7 +129,8 @@ typedef struct stat_s {
 
 typedef union mkdev_u {
     struct {
-        void(*driver)(void);        /* driver */
+        void(*driver)(void* args);        /* driver */
+        void* args;                         /* driver */
     } ask;
     struct {
         int             id;         /* devtab id */
@@ -239,7 +240,7 @@ typedef struct vfsmsg_s {
  */
 
 
-void vfs (void);
+void vfs (void* args);
 
 pid_t setvfspid (pid_t pid);
 
@@ -253,7 +254,7 @@ pid_t setvfspid (pid_t pid);
 
 pid_t vfs_addtask (pid_t pid, pid_t parent);
 void vfs_deletetask (pid_t pid);
-int mkdev (void(*p)(void));
+int mkdev (void(*p)(void* args), void* args);
 int mknod (int dev, char* name, mode_t mode);
 int pipe(int pipefd[2]);
 int open (char *name);

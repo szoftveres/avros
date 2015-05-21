@@ -606,7 +606,7 @@ do_pmfree (pmmsg_t* msg) {
 
 
 void
-pm (void) {
+pm (void* args UNUSED) {
     pid_t msg_client;
     
     pmmsg_t msg;

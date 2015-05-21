@@ -4,7 +4,7 @@
 
 pid_t setespid(pid_t pid);
 
-void es (void);
+void es (void* args);
 
 
 void es_regprg(char* name, int(*ptr)(char**), size_t stack);

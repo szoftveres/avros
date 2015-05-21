@@ -7,7 +7,7 @@
 typedef struct sema_s* sema;
 
 
-void semasrv (void);
+void semasrv (void* args);
 
 pid_t setsemapid (pid_t pid);
 
