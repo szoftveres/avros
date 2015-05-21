@@ -273,16 +273,19 @@ static char*
 k_build_initial_stack (task_t* newtask, void (*tp)(void), size_t stack) {
 
     cpu_context_t* ctxt;
+    size_t real_size;
+
+    real_size = stack + sizeof(cpu_context_t) + sizeof(void(*)(void));
 
     /* allocating stack */
-	newtask->sb = malloc(stack + sizeof(cpu_context_t) + sizeof(void(*)(void)));
+	newtask->sb = malloc(real_size);
     if(!newtask->sb){
         return (NULL);
     }
     ctxt = (cpu_context_t*)(newtask->sb + stack);
 
     /* PUSH: post decrement, POP: pre-increment */
-    newtask->sp = newtask->sb + stack + sizeof(cpu_context_t) + sizeof(void(*)(void)) - 1; 
+    newtask->sp = newtask->sb + real_size - 1;
     /* exit on return */
     k_stack_push(newtask, LOW(exittask));
     k_stack_push(newtask, HIGH(exittask));
