@@ -39,7 +39,7 @@ startup (void* args UNUSED) {
     /* setting up devices/files */
     
     mkdev(pipedev, NULL);
-    mknod(mkdev(usart0, (void*)12345), "usart0", S_IFCHR);
+    mknod(mkdev(usart0, NULL), "usart0", S_IFCHR);
     mkdev(memfile, NULL);
 
     /* starting executable store server */

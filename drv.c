@@ -50,7 +50,7 @@ void usart0_event (void* args UNUSED) {
  *
  */
 
-void usart0 (void* args) {
+void usart0 (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;  
     q_head_t rd_q;
@@ -76,7 +76,6 @@ void usart0 (void* args) {
                 launchtask(interrupt, usart0_event, NULL, DEFAULT_STACK_SIZE);
                 msg.client = client;
                 sendrec(interrupt, &msg, sizeof(msg));
-                /*XXX*/dputs("\nUsart0 args: "); dputu((unsigned int)args); dputc('\n');/*XXX*/
             }
             break;
           case VFS_IGET:

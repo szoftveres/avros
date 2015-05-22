@@ -314,7 +314,7 @@ pm_delchunks (q_head_t* que, q_item_t* chunk) {
 int
 argc (char* argv[]) {
     int i;
-    for(i=0; argv && argv[i]; i++);
+    for (i = 0; argv && argv[i]; i++);
     return i;
 }
 
@@ -326,21 +326,13 @@ static size_t
 pm_argstack_size (char* orgargv[]) {
     int i;
     size_t size = 0;
-    for(i=0; orgargv && orgargv[i]; i++){
+    for( i = 0; orgargv && orgargv[i]; i++){
         size += (strlen(orgargv[i]) + 1);
     }
     size += (sizeof(char*) * (i + 1));
     return size;
 }
 
-/*
- * User task launcher frame
- */
-
-static void
-pm_task_launcher (int(*ptsk)(char**), char** argv) {
-    mexit(ptsk(argv));
-}
 
 /* ======================================================
  *
@@ -384,6 +376,7 @@ patch_argstack (char* bottom, char* newbottom) {
 static pm_task_t*
 push_cpucontext (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**), 
         char** argv) {
+
     char   *stack;
     char   *sb;    
     size_t argsize = pm_argstack_size(argv);
@@ -407,15 +400,21 @@ push_cpucontext (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**),
     stack = (char*) kmalloc(sizeof(cpu_context_t));
     if (!stack) {
         return (NULL);
-    } 
+    }
+     
+    {
+        char c;
+        c = LOW(mexit);
+        pushstack(PM_PIDOF(ptsk), &c, 1);
+        c = HIGH(mexit);
+        pushstack(PM_PIDOF(ptsk), &c, 1);
+    }
 
     ((cpu_context_t*)stack)->r1 = 0;
-    ((cpu_context_t*)stack)->r22 = LOW((sb + sizeof(cpu_context_t) + stacksize));
-    ((cpu_context_t*)stack)->r23 = HIGH((sb + sizeof(cpu_context_t) + stacksize));
-    ((cpu_context_t*)stack)->r24 = LOW(ptr);
-    ((cpu_context_t*)stack)->r25 = HIGH(ptr);
-    ((cpu_context_t*)stack)->retHigh = HIGH(pm_task_launcher);
-    ((cpu_context_t*)stack)->retLow = LOW(pm_task_launcher);
+    ((cpu_context_t*)stack)->r24 = LOW((sb + sizeof(cpu_context_t) + stacksize));
+    ((cpu_context_t*)stack)->r25 = HIGH((sb + sizeof(cpu_context_t) + stacksize));
+    ((cpu_context_t*)stack)->retHigh = HIGH(ptr);
+    ((cpu_context_t*)stack)->retLow = LOW(ptr);
 
     pushstack(PM_PIDOF(ptsk), stack, sizeof(cpu_context_t));    
     kfree(stack);
