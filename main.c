@@ -22,18 +22,18 @@ startup (void* args UNUSED) {
     pid_t pid;
 
     /* starting timer server */
-    pid = addtask(TASK_PRIO_RT);
-    launchtask(pid, timer, NULL, DEFAULT_STACK_SIZE);
+    pid = cratetask(TASK_PRIO_RT);
+    launchtask(pid, timer, NULL, NULL, DEFAULT_STACK_SIZE);
     settimerpid(pid);
 
     /* starting semaphore server */
-    //pid = addtask(TASK_PRIO_HIGH);
+    //pid = cratetask(TASK_PRIO_HIGH);
     //launchtask(pid, semasrv, DEFAULT_STACK_SIZE);
     //setsemapid(pid);
 
     /* starting device manager server */
-    pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, vfs, NULL, DEFAULT_STACK_SIZE * 2);
+    pid = cratetask(TASK_PRIO_HIGH);
+    launchtask(pid, vfs, NULL, NULL, DEFAULT_STACK_SIZE * 2);
     setvfspid(pid);
 
     /* setting up devices/files */
@@ -43,8 +43,8 @@ startup (void* args UNUSED) {
     mkdev(memfile, NULL);
 
     /* starting executable store server */
-    pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, es, NULL, DEFAULT_STACK_SIZE);
+    pid = cratetask(TASK_PRIO_HIGH);
+    launchtask(pid, es, NULL, NULL, DEFAULT_STACK_SIZE);
     setespid(pid);
 
     /* registering user programs */
@@ -63,14 +63,14 @@ startup (void* args UNUSED) {
     es_regprg("grep",       grep,           DEFAULT_STACK_SIZE);
 
     /* starting process manager server */
-    pid = addtask(TASK_PRIO_HIGH);
-    launchtask(pid, pm, NULL, DEFAULT_STACK_SIZE * 2);
+    pid = cratetask(TASK_PRIO_HIGH);
+    launchtask(pid, pm, NULL, NULL, DEFAULT_STACK_SIZE * 2);
     setpmpid(pid);
 
     /* launching init */
-    pid = addtask(TASK_PRIO_DFLT);
+    pid = cratetask(TASK_PRIO_DFLT);
     pmreg(pid); /* This does FS registration as well */
-    launchtask(pid, init, NULL, DEFAULT_STACK_SIZE);     
+    launchtask(pid, init, NULL, NULL, DEFAULT_STACK_SIZE);     
 
     /* done, exiting */
     return;

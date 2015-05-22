@@ -252,7 +252,7 @@ pid_t setvfspid (pid_t pid);
 
 
 
-pid_t vfs_addtask (pid_t pid, pid_t parent);
+pid_t vfs_cratetask (pid_t pid, pid_t parent);
 void vfs_deletetask (pid_t pid);
 int mkdev (void(*p)(void* args), void* args);
 int mknod (int dev, char* name, mode_t mode);

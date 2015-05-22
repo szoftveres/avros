@@ -63,11 +63,11 @@ void* kmalloc (size_t size);
 
 void kfree (void* ptr);
 
-pid_t addtask(unsigned char prio);
+pid_t cratetask(unsigned char prio);
 
 void starttask(pid_t pid);
 
-char* createstack(pid_t pid, size_t size);
+char* allocatestack(pid_t pid, size_t size);
 
 void pushstack(pid_t pid, char* ptr, size_t size);
 
@@ -81,7 +81,8 @@ void kirqen(void);
 
 void kirqdis(void);
 
-void launchtask(pid_t pid, void(*ptsk)(void* args), void* args, size_t stacksize);
+pid_t launchtask(pid_t pid, void(*ptsk)(void* args), void* args, void(*exitfn)(void), size_t stacksize);
+void setuptask(pid_t pid, void(*ptsk)(void* args), void* args, void(*exitfn)(void));
 
 
 /*

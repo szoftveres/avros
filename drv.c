@@ -72,8 +72,8 @@ void usart0 (void* args UNUSED) {
 
           case VFS_MKDEV: {
                 pid_t       interrupt;
-                interrupt = addtask(TASK_PRIO_RT);
-                launchtask(interrupt, usart0_event, NULL, DEFAULT_STACK_SIZE);
+                interrupt = cratetask(TASK_PRIO_RT);
+                launchtask(interrupt, usart0_event, NULL, NULL, DEFAULT_STACK_SIZE);
                 msg.client = client;
                 sendrec(interrupt, &msg, sizeof(msg));
             }

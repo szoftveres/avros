@@ -388,7 +388,7 @@ push_cpucontext (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**),
     cook_argstack(stack, argv);
     /* all data is saved, we can free the old stack */
     stoptask(PM_PIDOF(ptsk));
-    sb = createstack(PM_PIDOF(ptsk), (sizeof(cpu_context_t) + argsize + stacksize));
+    sb = allocatestack(PM_PIDOF(ptsk), (sizeof(cpu_context_t) + argsize + stacksize));
 	if (!sb) {
         kfree(stack);
 		return (NULL);
@@ -435,7 +435,7 @@ do_reg (pmmsg_t* msg) {
     if(!Q_END(&task_q, pm_task)){
         return 0;   /* Sorry... */
     }
-    if(!vfs_addtask(msg->reg.pid, NULL)){
+    if(!vfs_cratetask(msg->reg.pid, NULL)){
         return 0;
     }
     return 1;
@@ -449,7 +449,7 @@ do_spawn (pmmsg_t* msg) {
     pid_t       task;
     pm_task_t*  pm_task;
 
-    task = addtask(TASK_PRIO_DFLT);
+    task = cratetask(TASK_PRIO_DFLT);
     if (!task) {
         return;   /* Sorry... */
     }
@@ -457,7 +457,7 @@ do_spawn (pmmsg_t* msg) {
     if (!Q_END(&task_q, pm_task)) {
         return;   /* Sorry... */
     }                
-    if (!vfs_addtask(task, PM_PIDOF(PM_CLIENT))){
+    if (!vfs_cratetask(task, PM_PIDOF(PM_CLIENT))){
         return;   /* Sorry... */
     }
     if (!push_cpucontext(pm_task, msg->spawn.ask.stack, 
