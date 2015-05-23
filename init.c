@@ -27,15 +27,14 @@ launchsession (char** argv) {
  *
  */
 
-void
-init (void* args UNUSED) {
+int
+init (char** argv UNUSED) {
     char* session_arg[3];
     unsigned int i;
     pid_t pid;
 
     session_t session[] = {
             {"getty", "1/0", NULL},
-//            {"getty", "usart1", NULL}, 
     };    
 
     while (1) {

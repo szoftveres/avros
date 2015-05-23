@@ -11,6 +11,7 @@
 typedef union cratetask_u {
     struct {
         unsigned char   prio;           /* priority */
+        char            page;           /* priority */
     } ask;
     struct {
         pid_t           pid;            /* pid */
@@ -70,18 +71,6 @@ typedef struct starttask_s {
 } starttask_t;
 
 /*
- * LAUNCH TASK
- */
-
-typedef struct launchtask_s {
-    pid_t           pid;            /* pid */
-    void(*ptr)(void* args);         /* task entry */
-    void* args;                     /* arguments */
-    void(*exitfn)(void);            /* arguments */
-    size_t          stack;          /* stack size */
-} launchtask_t;
-
-/*
  * SETUP TASK
  */
 
@@ -106,16 +95,6 @@ typedef union allocatestack_u {
         char*           ptr;            /* ptr */
     } ans;
 } allocatestack_t;
-
-/*
- * FILL_STACK
- */
-
-typedef struct pushstack_s {
-    pid_t           pid;            /* pid */
-    char*           ptr;            /* custom stack */
-    size_t          size;           /* size */
-} pushstack_t;
 
 /*
  * FREE
@@ -154,8 +133,6 @@ typedef struct kcall_s {
         kfree_t         kfree;          /* free */
         cratetask_t       cratetask;        /* add task */
         allocatestack_t   allocatestack;    /* create stack */
-        pushstack_t     pushstack;      /* push data on stack */
-        launchtask_t    launchtask;     /* launch task */
         setuptask_t     setuptask;      /* setup task */
         stoptask_t      stoptask;       /* stop task */
         deletetask_t    deletetask;     /* delete task */
@@ -187,15 +164,17 @@ static int                  eventcode;     /* kernel event code */
 
 typedef struct task_s {    
     QUEUE_HEADER
-    char*            sp;            /* stack pointer */
-    char*            sb;            /* stack bottom */
-    kcall_t        kcall;       /* kernel call parameters */
-    unsigned char    prio;          /* task priority */
-    char             flags;         /* task flags */
+    char*           sp;            /* stack pointer */
+    char*           sb;            /* stack bottom */
+    kcall_t         kcall;         /* kernel call parameters */
+    unsigned char   prio;          /* task priority */
+    unsigned char   flags;         /* task flags */
+    char            page;          /* page (-1 = invalid) */
 } task_t;
 
 
-#define TASK_FLAG_IRQDIS    (0x01)
+#define TASK_FLAG_IRQDIS        (0x01)
+#define TASK_FLAG_USE_PAGES     (0x02)
 
 /*
  * kernel call codes
@@ -203,25 +182,23 @@ typedef struct task_s {
 
 enum { 
     KRNL_YIELD          = 0,
+
     KRNL_WAITEVENT,
+
     KRNL_MALLOC,
     KRNL_FREE,
+
     KRNL_SEND,
 	KRNL_SENDREC,
     KRNL_RECEIVE,
 
     KRNL_CREATETASK,
-    KRNL_DELETETASK,
-
+    KRNL_ALLOCATESTACK,
+    KRNL_SETUPTASK,
     KRNL_STARTTASK,
     KRNL_STOPTASK,
-
-    KRNL_LAUNCHTASK,
-    KRNL_SETUPTASK,
+    KRNL_DELETETASK,    
     KRNL_EXITTASK,
-
-    KRNL_ALLOCATESTACK,
-    KRNL_PUSHSTACK,
 
     KRNL_IRQEN,
     KRNL_IRQDIS,
@@ -276,64 +253,43 @@ idle_task (void* args UNUSED) {
  */
 
 static void
-k_stack_push (task_t* tp, char val) {
-    *(tp->sp) = val;
-    tp->sp -= 1;
+do_pushstack (task_t* task, char val) {
+    *(task->sp) = val;
+    task->sp -= 1;
 }
 
-/*
- * Create initial CPU context for a task
- */
 
 static char*
-k_build_initial_stack (task_t* newtask, void (*tp)(void* args), void* args, void (*exitfn)(void), size_t stack) {
+do_allocatestack (task_t* task, size_t size) {
 
-    cpu_context_t* ctxt;
-    size_t real_size;
-
-    real_size = stack + 
-                sizeof(cpu_context_t) + 
-                sizeof(void(*)(void* args)) + 
-                sizeof(void (*)(void));
-
-    /* allocating stack */
-	newtask->sb = malloc(real_size);
-    if(!newtask->sb){
-        return (NULL);
+    if (!size) {
+        return NULL;
     }
-    ctxt = (cpu_context_t*)(newtask->sb + stack);
-
-    /* PUSH: post decrement, POP: pre-increment */
-    newtask->sp = newtask->sb + real_size - 1;
-    /* exit on return */
-    k_stack_push(newtask, LOW(exitfn ? exitfn : exittask));
-    k_stack_push(newtask, HIGH(exitfn ? exitfn : exittask));
-
-    newtask->sp -= sizeof(cpu_context_t);
-    ctxt->r24 = LOW(args);
-    ctxt->r25 = HIGH(args);
-    ctxt->retLow = LOW(tp);
-    ctxt->retHigh = HIGH(tp);
-    ctxt->r1 = 0;                                   /* GCC needs r1 to be 0x00 */
-    return (newtask->sb);
+    /* cpu_context + exit fn */
+    size += (sizeof(cpu_context_t) +
+             sizeof(void (*)(void)));
+    task->sb = malloc(size);
+    if (task->sb) {
+        task->sp = task->sb + size - 1;
+    }
+    return (task->sb);
 }
-
 
 /*
  * Push CPU context for a task
  */
 
-void
-do_setuptask (task_t* newtask, void (*tp)(void* args), void* args, void (*exitfn)(void)) {
+static void
+do_setuptask (task_t* task, void (*tp)(void* args), void* args, void (*exitfn)(void)) {
 
     cpu_context_t* ctxt;
-    
-    k_stack_push(newtask, LOW(exitfn ? exitfn : exittask));
-    k_stack_push(newtask, HIGH(exitfn ? exitfn : exittask));
-    
-    newtask->sp -= sizeof(cpu_context_t);
 
-    ctxt = (cpu_context_t*)(newtask->sb + 1);
+    do_pushstack(task, LOW(exitfn ? exitfn : exittask));
+    do_pushstack(task, HIGH(exitfn ? exitfn : exittask));
+
+    task->sp -= sizeof(cpu_context_t);
+
+    ctxt = (cpu_context_t*)(task->sp + 1);
  
     ctxt->r24 = LOW(args);
     ctxt->r25 = HIGH(args);
@@ -534,38 +490,21 @@ initkrnl (void) {
 }
 
 /*
- * Initialize idle task
- */  
-
-static pid_t
-initidle (void) {
-    pid_t task = newtask();
-    if (!task) {
-        return (NULL);
-    }
-    if (!k_build_initial_stack(task, idle_task, NULL, NULL, 0x80)) {
-        free(task);
-        return (NULL);
-    }
-    task->prio = TASK_PRIO_IDLE;          /* Lowest priority */
-    return (task);
-}
-
-/*
  * initialize the first user task
  */  
 
 static pid_t
-initusertask (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
+inittask (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
     pid_t task = newtask();
     if(!task){
         return (NULL);
     }
-    if(!k_build_initial_stack(task, ptp, args, NULL, stack)){
-        free(task);
+    if (!do_allocatestack (task, stack)) {
         return (NULL);
     }
-    task->prio = prio; 
+    do_setuptask(task, ptp, args, NULL);
+    task->prio = prio;
+    Q_END(&queue[task->prio], task);
     return (task);
 }
 
@@ -586,17 +525,8 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
         return;
     }
 
-    wtask = initidle();
-    if(!wtask){
-        return;
-    }
-    Q_END(&queue[wtask->prio], wtask); 
-
-    wtask = initusertask(ptp, args, stack, prio);
-    if(!wtask){
-        return;
-    }
-    Q_END(&queue[wtask->prio], wtask);   /* Start with first user task */
+    inittask(idle_task, NULL, 0x80, TASK_PRIO_IDLE);
+    inittask(ptp, args, stack, prio);
 
     while (1) {
         scheduler(); 
@@ -629,44 +559,17 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
 			wtask = (pid_t) Q_FRONT(&blocked_q, newtask());
 			if (wtask) {
                 wtask->prio = CURRENT->kcall.cratetask.ask.prio;
+                wtask->page = CURRENT->kcall.cratetask.ask.page;
 				wtask->sb = NULL;
 			}
 			CURRENT->kcall.cratetask.ans.pid = wtask;
-			break;
-	 
-		  case KRNL_STARTTASK:      /* Start a task */
-			wtask = CURRENT->kcall.starttask.pid;
-             /* put new task at the end of rdy queue */
-            Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
 			break;
 
 		  case KRNL_ALLOCATESTACK:    /* Create new stack frame */
 			wtask = CURRENT->kcall.allocatestack.ask.pid;
             /* cpu_context + exit fn */
-            CURRENT->kcall.allocatestack.ask.size += (sizeof(cpu_context_t) +
-                                                      sizeof(void (*)(void)));
-			wtask->sb = malloc(CURRENT->kcall.allocatestack.ask.size);
-			wtask->sp = wtask->sb + CURRENT->kcall.allocatestack.ask.size - 1; 
-			CURRENT->kcall.allocatestack.ans.ptr = wtask->sb;
-			break;
-
-		  case KRNL_PUSHSTACK:      /* Push data onto the stack */
-			wtask = CURRENT->kcall.pushstack.pid;
-            wtask->sp -= CURRENT->kcall.pushstack.size;
-            memcpy((wtask->sp + 1), CURRENT->kcall.pushstack.ptr,
-                   CURRENT->kcall.pushstack.size);
-			break;
-
-		  case KRNL_LAUNCHTASK:     /* Start a task with built-in context */
-			wtask = CURRENT->kcall.launchtask.pid;
-			if(!k_build_initial_stack(wtask,
-                                      CURRENT->kcall.launchtask.ptr, 
-                                      CURRENT->kcall.launchtask.args, 
-                                      CURRENT->kcall.launchtask.exitfn,
-                                      CURRENT->kcall.launchtask.stack)){
-				continue; /* Sorry... */
-			}
-            Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
+            CURRENT->kcall.allocatestack.ans.ptr = 
+                do_allocatestack(wtask, CURRENT->kcall.allocatestack.ask.size);
 			break;
 
           case KRNL_SETUPTASK:
@@ -675,6 +578,13 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
                          CURRENT->kcall.setuptask.ptr, 
                          CURRENT->kcall.setuptask.args, 
                          CURRENT->kcall.setuptask.exitfn);
+			break;
+
+		  case KRNL_STARTTASK:      /* Start a task */
+			wtask = CURRENT->kcall.starttask.pid;
+             /* put new task at the end of rdy queue */
+            Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
+            //Q_FRONT(&queue[old->prio], Q_REMV(&current_q, CURRENT));
 			break;
 
 		  case KRNL_STOPTASK:       /* Delete the stack of a blocked task */
@@ -873,23 +783,12 @@ receive (pid_t src, void* msg, size_t len) {
  */
 
 pid_t
-cratetask (unsigned char prio) {
+cratetask (unsigned char prio, char page) {
     CURRENT->kcall.cratetask.ask.prio = prio;
+    CURRENT->kcall.cratetask.ask.page = page;
     CURRENT->kcall.code = (KRNL_CREATETASK);
     swtrap();
     return (CURRENT->kcall.cratetask.ans.pid);
-}
-
-/*
- *
- */
-
-void
-starttask (pid_t pid) {
-    CURRENT->kcall.starttask.pid = pid;
-    CURRENT->kcall.code = (KRNL_STARTTASK);
-    swtrap();
-    return;
 }
 
 /*
@@ -910,41 +809,6 @@ allocatestack (pid_t pid, size_t size) {
  */
 
 void
-pushstack (pid_t pid, char* ptr, size_t size) {
-    CURRENT->kcall.pushstack.pid = pid;   
-    CURRENT->kcall.pushstack.ptr = ptr;
-    CURRENT->kcall.pushstack.size = size;
-    CURRENT->kcall.code = (KRNL_PUSHSTACK);
-    swtrap();
-    return;
-}
-
-/*
- *
- */
-
-pid_t
-launchtask (pid_t pid,
-            void(*ptsk)(void* args),
-            void* args,
-            void(*exitfn)(void),
-            size_t stacksize) {
-
-    CURRENT->kcall.launchtask.pid = pid;   
-    CURRENT->kcall.launchtask.ptr = ptsk;
-    CURRENT->kcall.launchtask.args = args;
-    CURRENT->kcall.launchtask.exitfn = exitfn;
-    CURRENT->kcall.launchtask.stack = stacksize;
-    CURRENT->kcall.code = (KRNL_LAUNCHTASK);
-    swtrap();
-    return (CURRENT->kcall.launchtask.pid);
-}
-
-/*
- *
- */
-
-void
 setuptask (pid_t pid,
            void(*ptsk)(void* args),
            void* args,
@@ -958,6 +822,19 @@ setuptask (pid_t pid,
     swtrap();
     return;
 }
+
+/*
+ *
+ */
+
+void
+starttask (pid_t pid) {
+    CURRENT->kcall.starttask.pid = pid;
+    CURRENT->kcall.code = (KRNL_STARTTASK);
+    swtrap();
+    return;
+}
+
 /*
  *
  */

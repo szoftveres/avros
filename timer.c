@@ -152,8 +152,11 @@ timer (void* args UNUSED) {
         
     timer_init();
 
-    client = cratetask(TASK_PRIO_RT);
-    launchtask(client, timerworker, NULL, NULL, DEFAULT_STACK_SIZE);
+    client = cratetask(TASK_PRIO_RT, PAGE_INVALID);
+    allocatestack(client, DEFAULT_STACK_SIZE);
+    setuptask(client, timerworker, NULL, NULL);
+    starttask(client);
+
     send(client, NULL);
 
     while (1) {

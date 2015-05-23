@@ -37,6 +37,10 @@ typedef struct task_s* pid_t;
 /* DEFAULT STACK SIZE */
 #define DEFAULT_STACK_SIZE  ((size_t)(128))
 
+/* PAGE INVALID */
+#define PAGE_INVALID  ((char)(-1))
+
+
 /*
  *
  */
@@ -63,13 +67,14 @@ void* kmalloc (size_t size);
 
 void kfree (void* ptr);
 
-pid_t cratetask(unsigned char prio);
 
-void starttask(pid_t pid);
+pid_t cratetask(unsigned char prio, char page);
 
 char* allocatestack(pid_t pid, size_t size);
 
-void pushstack(pid_t pid, char* ptr, size_t size);
+void setuptask(pid_t pid, void(*ptsk)(void* args), void* args, void(*exitfn)(void));
+
+void starttask(pid_t pid);
 
 void stoptask(pid_t pid);
 
@@ -81,8 +86,7 @@ void kirqen(void);
 
 void kirqdis(void);
 
-pid_t launchtask(pid_t pid, void(*ptsk)(void* args), void* args, void(*exitfn)(void), size_t stacksize);
-void setuptask(pid_t pid, void(*ptsk)(void* args), void* args, void(*exitfn)(void));
+
 
 
 /*

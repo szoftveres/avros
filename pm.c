@@ -4,8 +4,6 @@
 #include "kernel.h"
 #include "queue.h"
 
-#include "sys.h"
-
 /*
 ============================================================
 */
@@ -19,6 +17,7 @@ typedef struct pm_task_s {
         int             exitcode;  /* Exit code of zombie */
     };
     struct pm_task_s*   parent;
+    char**              args;
 } pm_task_t;
 
 #define PM_PIDOF(p) ((p) ? ((p)->pid) : (NULL))
@@ -249,6 +248,7 @@ pm_removechild (q_head_t* que, q_item_t* ptsk) {
     if(((pm_task_t*)ptsk)->parent != PM_CLIENT) {
         return (NULL);
     }
+    kfree(((pm_task_t*)ptsk)->args);
     kfree(Q_REMV(que, ptsk));
     return (NULL);
 }
@@ -334,7 +334,7 @@ pm_argstack_size (char* orgargv[]) {
 }
 
 
-/* ======================================================
+/*
  *
  */
 
@@ -353,95 +353,43 @@ cook_argstack (char* bottom, char* orgargv[]) {
 }
 
 /*
- *
- */
-
-static void
-patch_argstack (char* bottom, char* newbottom) {
-    char** argp = (char**) bottom;
-    while(*argp){
-        if(newbottom > bottom) {
-            *argp += (newbottom - bottom);
-        } else {
-            *argp -= (bottom - newbottom);
-        }
-        argp++;
-    }
-}
-
-/*
- *
- */
-
-static pm_task_t*
-push_cpucontext (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**), 
-        char** argv) {
-
-    char   *stack;
-    char   *sb;    
-    size_t argsize = pm_argstack_size(argv);
-
-    stack = (char*) kmalloc(argsize);     
-    if (!stack) {
-        return (NULL);
-    }
-    cook_argstack(stack, argv);
-    /* all data is saved, we can free the old stack */
-    stoptask(PM_PIDOF(ptsk));
-    sb = allocatestack(PM_PIDOF(ptsk), (sizeof(cpu_context_t) + argsize + stacksize));
-	if (!sb) {
-        kfree(stack);
-		return (NULL);
-	}
-    patch_argstack(stack, (sb + sizeof(cpu_context_t) + stacksize));
-    pushstack(PM_PIDOF(ptsk), stack, argsize);
-    kfree(stack);
-
-    stack = (char*) kmalloc(sizeof(cpu_context_t));
-    if (!stack) {
-        return (NULL);
-    }
-     
-    {
-        char c;
-        c = LOW(mexit);
-        pushstack(PM_PIDOF(ptsk), &c, 1);
-        c = HIGH(mexit);
-        pushstack(PM_PIDOF(ptsk), &c, 1);
-    }
-
-    ((cpu_context_t*)stack)->r1 = 0;
-    ((cpu_context_t*)stack)->r24 = LOW((sb + sizeof(cpu_context_t) + stacksize));
-    ((cpu_context_t*)stack)->r25 = HIGH((sb + sizeof(cpu_context_t) + stacksize));
-    ((cpu_context_t*)stack)->retHigh = HIGH(ptr);
-    ((cpu_context_t*)stack)->retLow = LOW(ptr);
-
-    pushstack(PM_PIDOF(ptsk), stack, sizeof(cpu_context_t));    
-    kfree(stack);
-    return (ptsk);
-}
-
-
-
-/*
 ============================================================
 */
 
-int
-do_reg (pmmsg_t* msg) {
-    pm_task_t*  pm_task;
 
-    pm_task = pm_newtask(msg->reg.pid, NULL);
-    if(!Q_END(&task_q, pm_task)){
-        return 0;   /* Sorry... */
+static pm_task_t*
+pm_setuptask (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**), 
+        char** argv) {
+
+    /* exec: we may copy from the old args, so keep them */
+    char** newargs; 
+
+    newargs = (char**) kmalloc(pm_argstack_size(argv));     
+    if (!newargs) {
+        return (NULL);
     }
-    if(!vfs_cratetask(msg->reg.pid, NULL)){
-        return 0;
+    cook_argstack((char*)newargs, argv);
+    /* all data is saved, we can free the old data */
+    stoptask(PM_PIDOF(ptsk));
+    q_forall(&(ptsk->chunk_q), pm_delchunks);
+    if (ptsk->args) {
+        kfree(ptsk->args);
+        ptsk->args = NULL;
     }
-    return 1;
+    ptsk->args = newargs;
+
+    allocatestack(PM_PIDOF(ptsk), stacksize);
+
+    setuptask(PM_PIDOF(ptsk),
+              (void(*)(void* args))ptr,
+              (void*)(newargs),
+              (void(*)(void))mexit);
+
+    return ptsk;
 }
 
 /*
+============================================================
 */
 
 void
@@ -449,7 +397,7 @@ do_spawn (pmmsg_t* msg) {
     pid_t       task;
     pm_task_t*  pm_task;
 
-    task = cratetask(TASK_PRIO_DFLT);
+    task = cratetask(TASK_PRIO_DFLT, PAGE_INVALID);
     if (!task) {
         return;   /* Sorry... */
     }
@@ -460,7 +408,7 @@ do_spawn (pmmsg_t* msg) {
     if (!vfs_cratetask(task, PM_PIDOF(PM_CLIENT))){
         return;   /* Sorry... */
     }
-    if (!push_cpucontext(pm_task, msg->spawn.ask.stack, 
+    if (!pm_setuptask(pm_task, msg->spawn.ask.stack, 
         msg->spawn.ask.ptp, msg->spawn.ask.argv)) {
         return;   /* Sorry... */
     }
@@ -481,15 +429,49 @@ do_exec (pmmsg_t* msg) {
     if (!ptr) {
         return 1;  /* Error, send reply */
     }
-    if (!push_cpucontext(PM_CLIENT, stacksize, ptr,
+    if (!pm_setuptask(PM_CLIENT, stacksize, ptr,
             msg->exec.ask.argv)) {
         /* nothing to do, task should be removed completely */
         return 0;
-    }
-    q_forall(&(PM_CLIENT->chunk_q), pm_delchunks);
+    }    
     starttask(PM_CLIENT->pid);
     /* no reply */
     return 0;
+}
+
+/*
+*/
+
+void
+do_spawnexec (pmmsg_t* msg) {
+    pid_t       task;
+    pm_task_t*  pm_task;
+    int(*ptr)(char**);
+    size_t stacksize;
+
+    task = cratetask(TASK_PRIO_DFLT, PAGE_INVALID);
+    if (!task) {
+        return;   /* Sorry... */
+    }
+    pm_task = pm_newtask(task, PM_CLIENT);
+    if (!Q_END(&task_q, pm_task)) {
+        return;   /* Sorry... */
+    }                
+    if (!vfs_cratetask(task, PM_PIDOF(PM_CLIENT))) {
+        return;   /* Sorry... */
+    }
+    es_getprg(msg->exec.ask.name, &ptr, &stacksize);          
+    if (!ptr) {
+        return;  /* Error, send reply */
+    }
+    if (!pm_setuptask(pm_task, stacksize, ptr,
+            msg->exec.ask.argv)) {
+        /* nothing to do, task should be removed completely */
+        return;
+    }    
+    starttask(task);
+    msg->spawn.ans.pid = task;
+    return;
 }
 
 /*
@@ -512,6 +494,7 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
 
     if (!PM_CLIENT->parent) {
         /* client is orphan, remove it */
+        kfree(PM_CLIENT->args);
         kfree(Q_REMV(&task_q, PM_CLIENT));
         return 0; /* No reply */
     }
@@ -526,6 +509,7 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
         msg->wait.ans.pid = PM_PIDOF(PM_CLIENT); /* PID */
         msg->wait.ans.code = PM_CLIENT->exitcode; /* ExitCode */
         *replyto = PM_PIDOF(pm_task); /* Reply to parent */
+        kfree(PM_CLIENT->args);
         kfree(Q_REMV(&task_q, PM_CLIENT)); /* Remove PM_CLIENT */
     } else {
         /* parent is not waiting yet */
@@ -549,6 +533,7 @@ do_wait (pmmsg_t* msg) {
     if (pm_task) {	/* found a zombie child */
         msg->wait.ans.pid = PM_PIDOF(pm_task); /* PID */
         msg->wait.ans.code = pm_task->exitcode; /*Exit Code*/
+        kfree(pm_task->args);
         kfree(Q_REMV(&zombie_q, pm_task)); /* Remove zombie child */
         return 1; /* Reply to client */
     }
@@ -603,28 +588,25 @@ do_pmfree (pmmsg_t* msg) {
 ============================================================
 */
 
-
 void
-pm (void* args UNUSED) {
+pm (void* args) {
     pid_t msg_client;
-    
     pmmsg_t msg;
 
     q_init(&task_q);
     q_init(&wait_q);
     q_init(&zombie_q);
 
+    
+    msg.exec.ask.name = ((char**)args)[0];
+    msg.exec.ask.argv = &(((char**)args)[0]);
+    do_spawnexec(&msg);
+
     while (1) {
         msg_client = receive(TASK_ANY, &msg, sizeof(msg));
         Q_FRONT(&task_q, Q_REMV(&task_q, pm_findbypid(msg_client)));
 
         switch(msg.cmd){
-
-          case PM_REG:
-            if (!do_reg(&msg)) {
-                continue;
-            }
-            break;
 
           case PM_SPAWN:
             do_spawn(&msg);
@@ -781,16 +763,4 @@ pmfree (void* ptr) {
     return;
 }
 
-/*
- *
- */
-
-void
-pmreg (pid_t pid) {
-    pmmsg_t msg;
-    msg.cmd = PM_REG;
-    msg.reg.pid = pid;
-    sendrec(pmtask, &msg, sizeof(msg));
-    return;
-}
 

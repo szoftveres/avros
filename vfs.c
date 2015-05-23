@@ -184,8 +184,11 @@ do_mkdev (vfsmsg_t *msg) {
         msg->mkdev.ans.id = -1;
         return;
     }
-    pid = cratetask(TASK_PRIO_HIGH);
-    launchtask(pid, msg->mkdev.ask.driver, msg->mkdev.ask.args, NULL, DEFAULT_STACK_SIZE);
+    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    allocatestack(pid, DEFAULT_STACK_SIZE);
+    setuptask(pid, msg->mkdev.ask.driver, msg->mkdev.ask.args, NULL);
+    starttask(pid);
+    
     devtab[i] = pid;
 
     msg->cmd = VFS_MKDEV;

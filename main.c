@@ -13,27 +13,26 @@
 
 /*
  * The main purpose of this task is to start all the servers and set
- * up the environment for the operating system.
- * It starts 'init' at the end, then exits.
+ * up the environment for the operating system. It exits at the end.
  */
 
 void
 startup (void* args UNUSED) {
     pid_t pid;
+    char* initc[] = {"init", NULL};
 
-    /* starting timer server */
-    pid = cratetask(TASK_PRIO_RT);
-    launchtask(pid, timer, NULL, NULL, DEFAULT_STACK_SIZE);
+    /* starting time server */
+    pid = cratetask(TASK_PRIO_RT, PAGE_INVALID);
+    allocatestack(pid, DEFAULT_STACK_SIZE);
+    setuptask(pid, timer, NULL, NULL);
+    starttask(pid);
     settimerpid(pid);
 
-    /* starting semaphore server */
-    //pid = cratetask(TASK_PRIO_HIGH);
-    //launchtask(pid, semasrv, DEFAULT_STACK_SIZE);
-    //setsemapid(pid);
-
     /* starting device manager server */
-    pid = cratetask(TASK_PRIO_HIGH);
-    launchtask(pid, vfs, NULL, NULL, DEFAULT_STACK_SIZE * 2);
+    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    allocatestack(pid, DEFAULT_STACK_SIZE * 2);
+    setuptask(pid, vfs, NULL, NULL);
+    starttask(pid);
     setvfspid(pid);
 
     /* setting up devices/files */
@@ -43,8 +42,10 @@ startup (void* args UNUSED) {
     mkdev(memfile, NULL);
 
     /* starting executable store server */
-    pid = cratetask(TASK_PRIO_HIGH);
-    launchtask(pid, es, NULL, NULL, DEFAULT_STACK_SIZE);
+    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    allocatestack(pid, DEFAULT_STACK_SIZE);
+    setuptask(pid, es, NULL, NULL);
+    starttask(pid);
     setespid(pid);
 
     /* registering user programs */
@@ -61,17 +62,17 @@ startup (void* args UNUSED) {
     es_regprg("stat",       f_stat,         DEFAULT_STACK_SIZE);
     es_regprg("mknod",      f_mknod,        DEFAULT_STACK_SIZE);
     es_regprg("grep",       grep,           DEFAULT_STACK_SIZE);
+    es_regprg("init",       init,           DEFAULT_STACK_SIZE);
 
     /* starting process manager server */
-    pid = cratetask(TASK_PRIO_HIGH);
-    launchtask(pid, pm, NULL, NULL, DEFAULT_STACK_SIZE * 2);
+    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    allocatestack(pid, DEFAULT_STACK_SIZE * 2);
+    setuptask(pid, pm, initc, NULL);
+    starttask(pid);
     setpmpid(pid);
 
-    /* launching init */
-    pid = cratetask(TASK_PRIO_DFLT);
-    pmreg(pid); /* This does FS registration as well */
-    launchtask(pid, init, NULL, NULL, DEFAULT_STACK_SIZE);     
-
+    /* HACK */
+    delay(5);
     /* done, exiting */
     return;
 }

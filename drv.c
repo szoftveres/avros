@@ -71,11 +71,13 @@ void usart0 (void* args UNUSED) {
         switch(msg.cmd){
 
           case VFS_MKDEV: {
-                pid_t       interrupt;
-                interrupt = cratetask(TASK_PRIO_RT);
-                launchtask(interrupt, usart0_event, NULL, NULL, DEFAULT_STACK_SIZE);
+                pid_t       task;
+                task = cratetask(TASK_PRIO_RT, PAGE_INVALID);
+                allocatestack(task, DEFAULT_STACK_SIZE);
+                setuptask(task, usart0_event, NULL, NULL);
+                starttask(task);
                 msg.client = client;
-                sendrec(interrupt, &msg, sizeof(msg));
+                sendrec(task, &msg, sizeof(msg));
             }
             break;
           case VFS_IGET:
