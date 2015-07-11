@@ -19,7 +19,7 @@
 void
 startup (void* args UNUSED) {
     pid_t pid;
-    char* initc[] = {"init", NULL};
+    char** initc;
 
     /* starting time server */
     pid = cratetask(TASK_PRIO_RT, PAGE_INVALID);
@@ -36,7 +36,6 @@ startup (void* args UNUSED) {
     setvfspid(pid);
 
     /* setting up devices/files */
-    
     mkdev(pipedev, NULL);
     mknod(mkdev(usart0, NULL), "usart0", S_IFCHR);
     mkdev(memfile, NULL);
@@ -65,14 +64,15 @@ startup (void* args UNUSED) {
     es_regprg("init",       init,           DEFAULT_STACK_SIZE);
 
     /* starting process manager server */
+    initc = (char**)kmalloc(sizeof(char*[2])); /* Freed in PM */
+    initc[0] = "init";
+    initc[1] = NULL;
     pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE * 2);
     setuptask(pid, pm, initc, NULL);
     starttask(pid);
     setpmpid(pid);
 
-    /* HACK */
-    delay(5);
     /* done, exiting */
     return;
 }

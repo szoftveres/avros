@@ -55,7 +55,7 @@ enum {
 };
 
 /*
- * SPAWN 
+ * SPAWN
  */
 
 typedef union spawn_u {
@@ -173,16 +173,16 @@ typedef struct pmmsg_s {
 
 static pm_task_t*
 pm_newtask (pid_t pid, pm_task_t* parent) {
-    pm_task_t* pt;    
+    pm_task_t* pt;
     pt = (pm_task_t*) kmalloc(sizeof(pm_task_t));
     if(!pt){
         return (NULL);
-    }    
-    memset(pt, 0x00, sizeof(pm_task_t)); 
+    }
+    memset(pt, 0x00, sizeof(pm_task_t));
     pt->pid = pid;
     q_init(&(pt->chunk_q));
-    pt->parent = parent;    
-    return (pt);   
+    pt->parent = parent;
+    return (pt);
 }
 
 /*
@@ -197,7 +197,7 @@ pm_findbypid (pid_t pid) {
             break;
         }
         it = (pm_task_t*)Q_NEXT(it);
-    } 
+    }
     return (it);
 }
 
@@ -213,7 +213,7 @@ pm_haschild (q_head_t* que UNUSED, q_item_t* ptsk) {
 }
 
 /**
- * Check whether ptsk is the child of PM_CLIENT, and PM_CLIENT is 
+ * Check whether ptsk is the child of PM_CLIENT, and PM_CLIENT is
  * waiting for it (ar any)
  */
 static q_item_t*
@@ -221,9 +221,9 @@ pm_findzombie (q_head_t* que UNUSED, q_item_t* ptsk) {
     if(((pm_task_t*)ptsk)->parent != PM_CLIENT) {
         return NULL;
     }
-    if(((PM_CLIENT->waitfor != PM_PIDOF(((pm_task_t*)ptsk))) 
+    if(((PM_CLIENT->waitfor != PM_PIDOF(((pm_task_t*)ptsk)))
         && (PM_CLIENT->waitfor != TASK_ANY))){
-    	return (NULL);
+        return (NULL);
 	}
     return (ptsk);
 }
@@ -290,7 +290,7 @@ findchunk (pm_task_t* ptsk, void* ptr) {
             break;
         }
         it = (mem_chunk_t*) Q_NEXT(it);
-    }   
+    }
     return (it);
 }
 
@@ -358,13 +358,13 @@ cook_argstack (char* bottom, char* orgargv[]) {
 
 
 static pm_task_t*
-pm_setuptask (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**), 
+pm_setuptask (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**),
         char** argv) {
 
     /* exec: we may copy from the old args, so keep them */
-    char** newargs; 
+    char** newargs;
 
-    newargs = (char**) kmalloc(pm_argstack_size(argv));     
+    newargs = (char**) kmalloc(pm_argstack_size(argv));
     if (!newargs) {
         return (NULL);
     }
@@ -404,11 +404,11 @@ do_spawn (pmmsg_t* msg) {
     pm_task = pm_newtask(task, PM_CLIENT);
     if (!Q_END(&task_q, pm_task)) {
         return;   /* Sorry... */
-    }                
+    }
     if (!vfs_cratetask(task, PM_PIDOF(PM_CLIENT))){
         return;   /* Sorry... */
     }
-    if (!pm_setuptask(pm_task, msg->spawn.ask.stack, 
+    if (!pm_setuptask(pm_task, msg->spawn.ask.stack,
         msg->spawn.ask.ptp, msg->spawn.ask.argv)) {
         return;   /* Sorry... */
     }
@@ -425,7 +425,7 @@ do_exec (pmmsg_t* msg) {
     int(*ptr)(char**);
     size_t stacksize;
 
-    es_getprg(msg->exec.ask.name, &ptr, &stacksize);          
+    es_getprg(msg->exec.ask.name, &ptr, &stacksize);
     if (!ptr) {
         return 1;  /* Error, send reply */
     }
@@ -433,7 +433,7 @@ do_exec (pmmsg_t* msg) {
             msg->exec.ask.argv)) {
         /* nothing to do, task should be removed completely */
         return 0;
-    }    
+    }
     starttask(PM_CLIENT->pid);
     /* no reply */
     return 0;
@@ -456,11 +456,11 @@ do_spawnexec (pmmsg_t* msg) {
     pm_task = pm_newtask(task, PM_CLIENT);
     if (!Q_END(&task_q, pm_task)) {
         return;   /* Sorry... */
-    }                
+    }
     if (!vfs_cratetask(task, PM_PIDOF(PM_CLIENT))) {
         return;   /* Sorry... */
     }
-    es_getprg(msg->exec.ask.name, &ptr, &stacksize);          
+    es_getprg(msg->exec.ask.name, &ptr, &stacksize);
     if (!ptr) {
         return;  /* Error, send reply */
     }
@@ -468,7 +468,7 @@ do_spawnexec (pmmsg_t* msg) {
             msg->exec.ask.argv)) {
         /* nothing to do, task should be removed completely */
         return;
-    }    
+    }
     starttask(task);
     msg->spawn.ans.pid = task;
     return;
@@ -483,7 +483,7 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
 
     q_forall(&(PM_CLIENT->chunk_q), pm_delchunks);
     stoptask(PM_PIDOF(PM_CLIENT));
-    deletetask(PM_PIDOF(PM_CLIENT)); 
+    deletetask(PM_PIDOF(PM_CLIENT));
     vfs_deletetask(PM_CLIENT->pid);
 
     /* Deleting zombie children */
@@ -500,11 +500,11 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
     }
     /* check whether parent task is in the waiting queue */
     pm_task = (pm_task_t*) q_forall(&wait_q, pm_findmyparent);
-    if (pm_task && 
-            ((pm_task->waitfor == PM_PIDOF(PM_CLIENT)) || 
+    if (pm_task &&
+            ((pm_task->waitfor == PM_PIDOF(PM_CLIENT)) ||
             (pm_task->waitfor == TASK_ANY))) {
         /* parent is waiting for client (or any) */
-        Q_END(&task_q, Q_REMV(&wait_q, pm_task));        
+        Q_END(&task_q, Q_REMV(&wait_q, pm_task));
         PM_CLIENT->exitcode = msg->exit.code; /* Save ExitCode from msg */
         msg->wait.ans.pid = PM_PIDOF(PM_CLIENT); /* PID */
         msg->wait.ans.code = PM_CLIENT->exitcode; /* ExitCode */
@@ -518,7 +518,7 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
         /* Client is now zombie */
 	    return 0; /* No reply */
     }
-    return 1;       
+    return 1;
 }
 
 /*
@@ -537,7 +537,7 @@ do_wait (pmmsg_t* msg) {
         kfree(Q_REMV(&zombie_q, pm_task)); /* Remove zombie child */
         return 1; /* Reply to client */
     }
-    if (!q_forall(&task_q, pm_haschild) && 
+    if (!q_forall(&task_q, pm_haschild) &&
             !q_forall(&wait_q, pm_haschild)) {
         /* ERROR, no child at all */
         msg->wait.ans.pid = 0; /* PID */
@@ -568,7 +568,7 @@ do_pmalloc (pmmsg_t* msg) {
     }
     Q_FRONT(&(PM_CLIENT->chunk_q), chunk);
     msg->malloc.ans.ptr = chunk->ptr;
-    return; 
+    return;
 }
 
 /*
@@ -597,10 +597,10 @@ pm (void* args) {
     q_init(&wait_q);
     q_init(&zombie_q);
 
-    
     msg.exec.ask.name = ((char**)args)[0];
     msg.exec.ask.argv = &(((char**)args)[0]);
     do_spawnexec(&msg);
+    kfree(args);
 
     while (1) {
         msg_client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -618,7 +618,7 @@ pm (void* args) {
             }
             break;
 
-          case PM_EXIT: 
+          case PM_EXIT:
             if (!do_exit(&msg, &msg_client)) {
                 continue;
             }
@@ -658,7 +658,7 @@ static pid_t pmtask;
 pid_t
 setpmpid (pid_t pid) {
     pmtask = pid;
-    return (pmtask);    
+    return (pmtask);
 }
 
 /*

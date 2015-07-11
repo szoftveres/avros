@@ -52,7 +52,7 @@ login (char** argv) {
 
     args[0] = "sh";
     args[1] = NULL;
-            
+
     execv(args[0], args);
     unknown(argv, args[0]);
     return (-1);
@@ -117,7 +117,7 @@ cat (char** argv) {
             return (-1);
         }
         docat();
-    }    
+    }
     return (0);
 }
 
@@ -155,7 +155,7 @@ xargs (char** argv) {
     }
     memset(args, 0x00, sizeof(args));
     buf = pmmalloc(256);    // max 256 bytes
-    
+
     for (ac = 0; argv[ac + 1]; ac++) {
         args[ac] = argv[ac + 1];
     }
@@ -173,7 +173,7 @@ xargs (char** argv) {
                 args[ac++] = lastwrd;
                 lastwrd = NULL;
                 buf[i++] = '\0';
-            }            
+            }
             break;
           default:
             if(!lastwrd){
@@ -181,7 +181,7 @@ xargs (char** argv) {
             }
             buf[i++] = c;
             break;
-        } 
+        }
     } while (c != EOF);
 
     execv(args[0], args);
@@ -363,7 +363,7 @@ grep (char** argv) {
         if (!dogrep(regexp, opt)) {
             c = 0;
         }
-    }    
+    }
     return (c);
 }
 
@@ -373,7 +373,7 @@ grep (char** argv) {
 
 /*
  *          [name]  [dev num]  [mode p:pipe  r:regular]
- * 
+ *
  *  $ mknod mf1 3 r
  *  $ mknod fifo 0 p
  */
