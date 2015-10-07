@@ -19,9 +19,6 @@ typedef struct vnode_s {
     int                 ino;    /* inode number on device */
     char                refcnt;
     mode_t              mode;
-    union {
-        q_head_t            msgs;
-    };
 } vnode_t;
 
 
@@ -213,7 +210,7 @@ do_mknod (vfsmsg_t *msg) {
 
     /* Link the node */
     msg->cmd = VFS_LINK;
-    msg->iget.ask.ino = ino;
+    msg->iget.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
 
     msg->mknod.ino = ino;
@@ -263,11 +260,12 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
     vtab[vidx].ino = msg->mknod.ino;
 
-    /* Get this new node */
+    /* Get this new node  2x */
     msg->cmd = VFS_IGET; 
-    msg->iget.ask.ino = vtab[vidx].ino;
+    msg->iget.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
-    vtab[vidx].mode = msg->iget.ans.mode;
+    sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    vtab[vidx].mode = msg->iget.mode;
     
     /* input */
     fp = find_empty_filp();
@@ -302,7 +300,6 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     filp[fp].refcnt++;
     vtab[vidx].refcnt++;
  
-    q_init(&(vtab[vidx].msgs));
     msg->pipe.fdo = fd;
 
     msg->pipe.result = 0;
@@ -329,12 +326,6 @@ do_open (vfs_task_t *client, vfsmsg_t *msg) {
         }
         vtab[vidx].dev = msg->openclose.dev;
         vtab[vidx].ino = msg->openclose.ino;
-
-        /* Get the node */
-        msg->cmd = VFS_IGET;
-        msg->iget.ask.ino = vtab[vidx].ino;
-        sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
-        vtab[vidx].mode = msg->iget.ans.mode;
     }
 
     fp = find_empty_filp();
@@ -347,12 +338,19 @@ do_open (vfs_task_t *client, vfsmsg_t *msg) {
         msg->openclose.fd = -1;
         return;
     }
+
     client->fd[fd] = fp;
     filp[fp].pos = 0;
     filp[fp].vidx = vidx;
     filp[fp].refcnt++;
     vtab[vidx].refcnt++;
-    q_init(&(vtab[vidx].msgs));
+
+    /* Get the node */
+    msg->cmd = VFS_IGET;
+    msg->iget.ino = vtab[vidx].ino;
+    sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    vtab[vidx].mode = msg->iget.mode;
+
     msg->openclose.fd = fd;
     return;
 }
@@ -366,8 +364,6 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
     int fp;
     int vidx;
     int fd = msg->openclose.fd;
-    vfsmsg_t* msg_p; /* Temporary pointer */
-    
 
     if (fd < 0) {
         return; /* Nothing to close */
@@ -382,25 +378,17 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
     if ((--(filp[fp].refcnt))) {
         return; /* refcnt not zero yet */
     }
-    if (vtab[vidx].mode == S_IFIFO) {
-        /* One end of the pipe has closed,
-         * hence sending EOF to waiting clients */
-        while(!Q_EMPTY(vtab[vidx].msgs)) {
-            msg_p = (vfsmsg_t*) Q_FIRST(vtab[vidx].msgs);
-            msg_p->rw.data = EOF;
-            send(msg_p->client, msg_p);
-            kfree(Q_REMV(&(vtab[vidx].msgs), msg_p));
-        }
-    }
-
-    if (--(vtab[vidx].refcnt)) {
-        return; /* refcnt not zero yet */
-    }
 
     /* No more refs, close this node */
     msg->cmd = VFS_IPUT;
-    msg->iput.ask.ino = vtab[vidx].ino;
+    msg->iput.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    while (msg->cmd == VFS_REPEAT) {
+        /* Unblocking waiting tasks(s) */
+        send(msg->client, msg);
+        sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    }
+    vtab[vidx].refcnt -= 1;
 
     return;
 }
@@ -413,7 +401,6 @@ static void
 do_rw (vfs_task_t *client, vfsmsg_t *msg) {
     int fd = msg->rw.fd;
     int vidx;
-    vfsmsg_t* msg_p; /* Temporary pointer */
 
     if ((fd < 0) || (client->fd[fd] < 0)) {
         msg->rw.data = EOF; /* wrong fd */
@@ -423,53 +410,15 @@ do_rw (vfs_task_t *client, vfsmsg_t *msg) {
     msg->rw.ino = vtab[vidx].ino;
     /* no need for FD from this point */
 
-    switch (vtab[vidx].mode) {
-      case S_IFREG:
-        msg->rw.pos = filp[client->fd[fd]].pos;
-        sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));  
-        filp[client->fd[fd]].pos += msg->rw.bnum;
-        break;
-
-      case S_IFCHR:
+    msg->rw.pos = filp[client->fd[fd]].pos;
+    sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    while (msg->cmd == VFS_REPEAT) {
+        /* Unblocking waiting tasks(s) */
+        send(msg->client, msg);
         sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
-        break;
-
-      case S_IFIFO:
-        if (Q_EMPTY(vtab[vidx].msgs)) {   /* Empty pipe */
-            if (vtab[vidx].refcnt <= 1) {
-                /* Other end detached, send EOF */
-                msg->rw.data = EOF;
-            } else {
-                /* FIFO empty, save request */
-                msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-                memcpy(msg_p, msg, sizeof(vfsmsg_t));
-                Q_END(&(vtab[vidx].msgs), msg_p);
-                msg->cmd = VFS_DONTREPLY;
-            }
-        } else {        /* Read or Write requests in the pipe */
-            msg_p = (vfsmsg_t*) Q_FIRST(vtab[vidx].msgs);
-            if (msg_p->cmd == msg->cmd) {
-                /* Same request type, save it */
-                msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-                memcpy(msg_p, msg, sizeof(vfsmsg_t));
-                Q_END(&(vtab[vidx].msgs), msg_p);
-                msg->cmd = VFS_DONTREPLY;
-            } else {
-                switch (msg_p->cmd) {
-                  case VFS_READC:
-                    msg_p->rw.data = msg->rw.data;
-                    break;
-                  case VFS_WRITEC:
-                    msg->rw.data = msg_p->rw.data;
-                    break;
-                }
-                /* release waiting task */
-                send(msg_p->client, msg_p);
-                kfree(Q_REMV(&(vtab[vidx].msgs), msg_p));
-            }
-        }
-        break;
     }
+    filp[client->fd[fd]].pos += msg->rw.bnum;
+
     return;
 }
 /*

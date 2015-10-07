@@ -81,7 +81,7 @@ void usart0 (void* args UNUSED) {
             }
             break;
           case VFS_IGET:
-            msg.iget.ans.mode = S_IFCHR;
+            msg.iget.mode = S_IFCHR;
             break;
           case VFS_READC:
             elem = (vfsmsg_t*)(Q_FIRST(rd_q));
@@ -94,6 +94,7 @@ void usart0 (void* args UNUSED) {
                 Q_END(&rd_q, elem);
                 msg.cmd = VFS_DONTREPLY;
             }
+            msg.rw.bnum = 0;
             break;
           
           case VFS_INTERRUPT:
@@ -120,7 +121,8 @@ void usart0 (void* args UNUSED) {
             break;
 
           case VFS_WRITEC:
-            usart0_wr(msg.rw.data); 
+            usart0_wr(msg.rw.data);
+            msg.rw.bnum = 0;
             break; 
         }
         send(client, &msg);
@@ -212,18 +214,18 @@ void memfile (void* args UNUSED) {
             break;
 
           case VFS_IGET:
-            nodes[msg.iget.ask.ino]->refcnt += 1;
-            msg.iget.ans.mode = nodes[msg.iget.ask.ino]->mode;
+            nodes[msg.iget.ino]->refcnt += 1;
+            msg.iget.mode = nodes[msg.iget.ino]->mode;
             break;
           case VFS_IPUT:
-            nodes[msg.iput.ask.ino]->refcnt -= 1;
-            if (nodes[msg.iput.ask.ino]->refcnt || 
-                nodes[msg.iput.ask.ino]->links) {
+            nodes[msg.iput.ino]->refcnt -= 1;
+            if (nodes[msg.iput.ino]->refcnt || 
+                nodes[msg.iput.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.iput.ask.ino]);
-            nodes[msg.iput.ask.ino] = NULL;
+            kfree(nodes[msg.iput.ino]);
+            nodes[msg.iput.ino] = NULL;
             break;
 
           case VFS_WRITEC:
@@ -260,9 +262,10 @@ void memfile (void* args UNUSED) {
 #define PD_MAX_NODES 8
 
 typedef struct pdnode_s {
-    char    refcnt;
-    char    links;
-    mode_t  mode;
+    char        refcnt;
+    char        links;
+    mode_t      mode;
+    q_head_t    msgs;
 } pdnode_t;
 
 int
@@ -280,6 +283,8 @@ void pipedev (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
     mode_t mode;
+    vfsmsg_t* msg_p; /* Temporary pointer */
+
     pdnode_t** nodes = (pdnode_t**)kmalloc(sizeof(pdnode_t*) * PD_MAX_NODES);
     
     memset(nodes, 0, (sizeof(pdnode_t*) * PD_MAX_NODES));
@@ -294,6 +299,7 @@ void pipedev (void* args UNUSED) {
             nodes[msg.mknod.ino]->refcnt = 0;
             nodes[msg.mknod.ino]->links = 0;
             nodes[msg.mknod.ino]->mode = mode;
+            q_init(&(nodes[msg.mknod.ino]->msgs));
             break;
 
 
@@ -312,24 +318,68 @@ void pipedev (void* args UNUSED) {
             break;
 
           case VFS_IGET:
-            nodes[msg.iget.ask.ino]->refcnt += 1;
-            msg.iget.ans.mode = nodes[msg.iget.ask.ino]->mode;
+            nodes[msg.iget.ino]->refcnt += 1;
+            msg.iget.mode = nodes[msg.iget.ino]->mode;
             break;
           case VFS_IPUT:
-            nodes[msg.iput.ask.ino]->refcnt -= 1;
-            if (nodes[msg.iput.ask.ino]->refcnt || 
-                nodes[msg.iput.ask.ino]->links) {
+            nodes[msg.iput.ino]->refcnt -= 1;
+            if (nodes[msg.iput.ino]->refcnt) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.iput.ask.ino]);
-            nodes[msg.iput.ask.ino] = NULL;
+            while (!Q_EMPTY(nodes[msg.iput.ino]->msgs)) {
+                msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.iput.ino]->msgs);
+                msg_p->rw.data = EOF;
+                msg_p->cmd = VFS_REPEAT;
+                sendrec(client, msg_p, sizeof(vfsmsg_t));
+                kfree(Q_REMV(&(nodes[msg.iput.ino]->msgs), msg_p));
+            }
+
+            if (nodes[msg.iput.ino]->links) {
+                /* More links, don't destroy */
+                break;
+            }
+            kfree(nodes[msg.iput.ino]);
+            nodes[msg.iput.ino] = NULL;
             break;
           case VFS_WRITEC:
-            msg.rw.data = EOF;
-            break;
           case VFS_READC:
-            msg.rw.data = EOF;
+            if (Q_EMPTY(nodes[msg.rw.ino]->msgs)) {   /* Empty pipe */
+                if (nodes[msg.rw.ino]->refcnt <= 1) {
+                    /* Other end detached, send EOF */
+                    msg.rw.data = EOF;
+                } else {
+                    /* FIFO empty, save request */
+                    msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+                    memcpy(msg_p, &msg, sizeof(vfsmsg_t));
+                    Q_END(&(nodes[msg.rw.ino]->msgs), msg_p);
+                    msg.cmd = VFS_DONTREPLY;
+                }
+            } else {        /* Read or Write requests in the pipe */
+                msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.rw.ino]->msgs);
+                if (msg_p->cmd == msg.cmd) {
+                    /* Same request type, save it */
+                    msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+                    memcpy(msg_p, &msg, sizeof(vfsmsg_t));
+                    Q_END(&(nodes[msg.rw.ino]->msgs), msg_p);
+                    msg.cmd = VFS_DONTREPLY;
+                } else {
+                    switch (msg_p->cmd) {
+                      case VFS_READC:
+                        msg_p->rw.data = msg.rw.data;
+                      break;
+                      case VFS_WRITEC:
+                        msg.rw.data = msg_p->rw.data;
+                      break;
+                    }
+                    /* release waiting task */
+                    msg_p->cmd = VFS_REPEAT;
+                    msg.rw.bnum = 0;
+                    sendrec(client, msg_p, sizeof(vfsmsg_t));
+                    kfree(Q_REMV(&(nodes[msg.rw.ino]->msgs), msg_p));
+                }
+            }
+            msg.rw.bnum = 0;
             break;
         }
         send(client, &msg);

@@ -20,6 +20,7 @@ enum {
     VFS_NONE,
     VFS_INTERRUPT,
     VFS_DONTREPLY,
+    VFS_REPEAT,
 
     VFS_STAT,
 
@@ -183,18 +184,12 @@ typedef struct dup_s {
  *
  */
 typedef union iget_u {
-    struct {
-        int     ino;
-    } ask;
-    struct {
-        mode_t     mode;
-    } ans;
+    int         ino;
+    mode_t      mode;
 } iget_t;
 
 typedef union iput_u {
-    struct {
-        int     ino;
-    } ask;
+    int         ino;
 } iput_t;
 
 
