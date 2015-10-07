@@ -81,7 +81,12 @@ void usart0 (void* args UNUSED) {
             }
             break;
           case VFS_IGET:
-            msg.iget.mode = S_IFCHR;
+            break;
+          case VFS_IPUT:
+            break;
+          case VFS_LINK:
+            break;
+          case VFS_UNLINK:
             break;
           case VFS_READC:
             elem = (vfsmsg_t*)(Q_FIRST(rd_q));
@@ -166,7 +171,6 @@ typedef struct mfnode_s {
     int     size;
     char    refcnt;
     char    links;
-    mode_t  mode;
 } mfnode_t;
 
 int
@@ -183,49 +187,61 @@ mf_find_empty_node (mfnode_t** list) {
 void memfile (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
-    mode_t  mode;
     mfnode_t** nodes = (mfnode_t**)kmalloc(sizeof(mfnode_t*) * MF_MAX_NODES); 
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch(msg.cmd){
           case VFS_MKNOD:
-            mode = msg.mknod.mode;
             msg.mknod.ino = mf_find_empty_node(nodes);
             nodes[msg.mknod.ino] = (mfnode_t*) kmalloc(sizeof(mfnode_t));
             nodes[msg.mknod.ino]->size = 0;
             nodes[msg.mknod.ino]->refcnt = 0;
             nodes[msg.mknod.ino]->links = 0;
-            nodes[msg.mknod.ino]->mode = mode;
             break;
 
           case VFS_LINK:
+            if (!nodes[msg.link.ino]) {
+                msg.link.ino = -1;
+                break;
+            }
             nodes[msg.link.ino]->links += 1;
             break;
           case VFS_UNLINK:
-            nodes[msg.unlink.ask.ino]->links -= 1;
-            if (nodes[msg.unlink.ask.ino]->refcnt || 
-                nodes[msg.unlink.ask.ino]->links) {
+            if (!nodes[msg.link.ino]) {
+                msg.link.ino = -1;
+                break;
+            }
+            nodes[msg.link.ino]->links -= 1;
+            if (nodes[msg.link.ino]->refcnt || 
+                nodes[msg.link.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.unlink.ask.ino]);
-            nodes[msg.unlink.ask.ino] = NULL;
+            kfree(nodes[msg.link.ino]);
+            nodes[msg.link.ino] = NULL;
             break;
 
           case VFS_IGET:
+            if (!nodes[msg.iget.ino]) {
+                msg.iget.ino = -1;
+                break;
+            }
             nodes[msg.iget.ino]->refcnt += 1;
-            msg.iget.mode = nodes[msg.iget.ino]->mode;
             break;
           case VFS_IPUT:
-            nodes[msg.iput.ino]->refcnt -= 1;
-            if (nodes[msg.iput.ino]->refcnt || 
-                nodes[msg.iput.ino]->links) {
+            if (!nodes[msg.iget.ino]) {
+                msg.iget.ino = -1;
+                break;
+            }
+            nodes[msg.iget.ino]->refcnt -= 1;
+            if (nodes[msg.iget.ino]->refcnt || 
+                nodes[msg.iget.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.iput.ino]);
-            nodes[msg.iput.ino] = NULL;
+            kfree(nodes[msg.iget.ino]);
+            nodes[msg.iget.ino] = NULL;
             break;
 
           case VFS_WRITEC:
@@ -264,7 +280,6 @@ void memfile (void* args UNUSED) {
 typedef struct pdnode_s {
     char        refcnt;
     char        links;
-    mode_t      mode;
     q_head_t    msgs;
 } pdnode_t;
 
@@ -282,7 +297,6 @@ pd_find_empty_node (pdnode_t** list) {
 void pipedev (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
-    mode_t mode;
     vfsmsg_t* msg_p; /* Temporary pointer */
 
     pdnode_t** nodes = (pdnode_t**)kmalloc(sizeof(pdnode_t*) * PD_MAX_NODES);
@@ -293,65 +307,78 @@ void pipedev (void* args UNUSED) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch (msg.cmd) {
           case VFS_MKNOD:
-            mode = msg.mknod.mode;
             msg.mknod.ino = pd_find_empty_node(nodes);
             nodes[msg.mknod.ino] = (pdnode_t*)kmalloc(sizeof(pdnode_t));
             nodes[msg.mknod.ino]->refcnt = 0;
             nodes[msg.mknod.ino]->links = 0;
-            nodes[msg.mknod.ino]->mode = mode;
             q_init(&(nodes[msg.mknod.ino]->msgs));
             break;
 
 
           case VFS_LINK:
+            if (!nodes[msg.link.ino]) {
+                msg.link.ino = -1;
+                break;
+            }
             nodes[msg.link.ino]->links += 1;
             break;
           case VFS_UNLINK:
-            nodes[msg.unlink.ask.ino]->links -= 1;
-            if (nodes[msg.unlink.ask.ino]->refcnt || 
-                nodes[msg.unlink.ask.ino]->links) {
+            if (!nodes[msg.link.ino]) {
+                msg.link.ino = -1;
+                break;
+            }
+            nodes[msg.link.ino]->links -= 1;
+            if (nodes[msg.link.ino]->refcnt || 
+                nodes[msg.link.ino]->links) {
                 /* more refs */
                 break;
             }
-            kfree(nodes[msg.unlink.ask.ino]);
-            nodes[msg.unlink.ask.ino] = NULL;
+            kfree(nodes[msg.link.ino]);
+            nodes[msg.link.ino] = NULL;
             break;
 
           case VFS_IGET:
+            if (!nodes[msg.iget.ino]) {
+                msg.iget.ino = -1;
+                break;
+            }
             nodes[msg.iget.ino]->refcnt += 1;
-            msg.iget.mode = nodes[msg.iget.ino]->mode;
             break;
           case VFS_IPUT:
-            nodes[msg.iput.ino]->refcnt -= 1;
+            if (!nodes[msg.iget.ino]) {
+                msg.iget.ino = -1;
+                break;
+            }
+            nodes[msg.iget.ino]->refcnt -= 1;
 
             /*
              * One end detached and no links, notify
              * waiting tasks and empty pipe
              */
-            if (nodes[msg.iput.ino]->refcnt == 1) {
-                while (!Q_EMPTY(nodes[msg.iput.ino]->msgs)) {
-                    msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.iput.ino]->msgs);
+            if (nodes[msg.iget.ino]->refcnt == 1) {
+                while (!Q_EMPTY(nodes[msg.iget.ino]->msgs)) {
+                    msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.iget.ino]->msgs);
                     msg_p->rw.data = EOF;
                     msg.rw.bnum = 0;
                     msg_p->cmd = VFS_REPEAT;
                     sendrec(client, msg_p, sizeof(vfsmsg_t));
-                    kfree(Q_REMV(&(nodes[msg.iput.ino]->msgs), msg_p));
+                    kfree(Q_REMV(&(nodes[msg.iget.ino]->msgs), msg_p));
                 }
                 break;
             }
 
-            if (nodes[msg.iput.ino]->refcnt) {
+            if (nodes[msg.iget.ino]->refcnt) {
                 /* more refs */
                 break;
             }
 
-            if (nodes[msg.iput.ino]->links) {
+            if (nodes[msg.iget.ino]->links) {
                 /* More links, don't destroy */
                 break;
             }
 
-            kfree(nodes[msg.iput.ino]);
-            nodes[msg.iput.ino] = NULL;
+            kfree(nodes[msg.iget.ino]);
+            nodes[msg.iget.ino] = NULL;
             break;
           case VFS_WRITEC:
           case VFS_READC:

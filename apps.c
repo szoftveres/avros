@@ -285,11 +285,10 @@ f_stat (char** argv) {
             unknown(argv, argv[i]);
             return (-1);
         }
-        mfprintf(1, "%s:\n ino:%x\n dev:%x\n size:%d\n mode:%d\n", argv[i],
+        mfprintf(1, "%s:\n ino:%x\n dev:%x\n size:%d\n", argv[i],
                  st.ino,
                  st.dev,
-                 st.size,
-                 st.mode);
+                 st.size);
     }
     return (0);
 }
@@ -372,42 +371,22 @@ grep (char** argv) {
 */
 
 /*
- *          [name]  [dev num]  [mode p:pipe  r:regular]
+ *          [dev num]   0:pipe, 1:usart, 2:memfile
  *
- *  $ mknod mf1 3 r
- *  $ mknod fifo 0 p
+ *  $ mknod 0
  */
 
 int
 f_mknod (char** argv) {
 
-    mode_t mode;
     int     inum;
 
-    if (argc(argv) < 4) {
+    if (argc(argv) < 2) {
         noargs(argv);
         return (-1);
     }
 
-    switch (argv[3][0]) {
-      case 'r':
-        mode = S_IFREG;
-        break;
-      case 'p':
-        mode = S_IFIFO;
-        break;
-      case 'c':
-        mode = S_IFCHR;
-        break;
-      default:
-        unknown(argv, argv[3]);
-        return (-1);
-    }
-    if (argv[3][1]) {
-        unknown(argv, argv[3]);
-        return (-1);
-    }
-    inum = mknod(atoi(argv[2]), argv[1], mode);
-    mfprintf(1, " %d/%d\n", atoi(argv[2]), inum);
+    inum = mknod(atoi(argv[1]), NULL);
+    mfprintf(1, " %d/%d\n", atoi(argv[1]), inum);
     return (0);
 }

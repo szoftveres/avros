@@ -5,15 +5,6 @@
 
 
 
-typedef enum mode_s {
-    S_IFREG,    /* Regular */
-    S_IFCHR,    /* Character Special */
-    S_IFIFO,    /* FIFO Special */
-//    S_IFDIR,    /* Directory */
-//    S_IFMNT,    /* Mount point */
-} mode_t;
-
-
 #define MAX_FD          (8)
 
 enum {   
@@ -60,7 +51,6 @@ struct stat {
     int     dev;
     int     ino;
     int     size;
-    mode_t  mode;
 };
 
 
@@ -154,10 +144,9 @@ typedef struct interrupt_s {
 
 typedef struct mknod_s {
     union {
-        int                 id;      /* dev in devtab */
+        int                 dev;      /* dev in devtab */
         int                 ino;        /* ino number */ 
     };
-    mode_t              mode;
     char*               name;       /* name */
 } mknod_t;
 
@@ -185,23 +174,11 @@ typedef struct dup_s {
  */
 typedef union iget_u {
     int         ino;
-    mode_t      mode;
 } iget_t;
-
-typedef union iput_u {
-    int         ino;
-} iput_t;
-
 
 typedef union link_u {
         int     ino;
 } link_t;
-
-typedef union unlink_u {
-    struct {
-        int     ino;
-    } ask;
-} unlink_t;
 
 /*
  * MESSAGE
@@ -222,9 +199,7 @@ typedef struct vfsmsg_s {
         pipe_t          pipe;
         adddel_t        adddel;        /* Client add del*/
         iget_t          iget;
-        iput_t          iput;
         link_t          link;
-        unlink_t        unlink;
     };
 } vfsmsg_t;
 
@@ -248,7 +223,7 @@ pid_t setvfspid (pid_t pid);
 pid_t vfs_cratetask (pid_t pid, pid_t parent);
 void vfs_deletetask (pid_t pid);
 int mkdev (void(*p)(void* args), void* args);
-int mknod (int dev, char* name, mode_t mode);
+int mknod (int dev, char* name);
 int pipe(int pipefd[2]);
 int open (char *name);
 int openi (int dev, int inum);

@@ -28,16 +28,16 @@ startup (void* args UNUSED) {
     starttask(pid);
     settimerpid(pid);
 
-    /* starting device manager server */
+    /* starting virtual filesystem server */
     pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE * 2);
     setuptask(pid, vfs, NULL, NULL);
     starttask(pid);
     setvfspid(pid);
 
-    /* setting up devices/files */
+    /* setting up devices and special files */
     mkdev(pipedev, NULL);
-    mknod(mkdev(usart0, NULL), "usart0", S_IFCHR);
+    mknod(mkdev(usart0, NULL), "usart0");
     mkdev(memfile, NULL);
 
     /* starting executable store server */

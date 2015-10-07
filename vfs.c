@@ -18,7 +18,6 @@ typedef struct vnode_s {
     int                 dev;
     int                 ino;    /* inode number on device */
     char                refcnt;
-    mode_t              mode;
 } vnode_t;
 
 
@@ -203,7 +202,7 @@ do_mknod (vfsmsg_t *msg) {
     int dev;
     int ino;
 
-    dev = msg->mknod.id; 
+    dev = msg->mknod.dev; 
     /* Create node on device */
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
     ino = msg->mknod.ino;
@@ -212,7 +211,10 @@ do_mknod (vfsmsg_t *msg) {
     msg->cmd = VFS_LINK;
     msg->link.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
-
+    if (msg->link.ino < 0) {
+        msg->mknod.ino = -1;
+        return; /* Cannot get node */
+    }
     msg->mknod.ino = ino;
     return;
 }
@@ -256,7 +258,6 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
 
     /* Create inode on device */
     msg->cmd = VFS_MKNOD;
-    msg->mknod.mode = S_IFIFO;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
     vtab[vidx].ino = msg->mknod.ino;
 
@@ -264,10 +265,17 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     msg->cmd = VFS_IGET; 
     msg->iget.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    if (msg->iget.ino < 0) {
+        msg->pipe.result = -1;
+        return; /* Cannot get node */
+    }
     msg->cmd = VFS_IGET; 
     msg->iget.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
-    vtab[vidx].mode = msg->iget.mode;
+    if (msg->iget.ino < 0) {
+        msg->pipe.result = -1;
+        return; /* Cannot get node */
+    }
     
     /* input */
     fp = find_empty_filp();
@@ -280,10 +288,10 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
         msg->pipe.result = -1;
         return;
     }
-    client->fd[fd] = fp;
+    vtab[vidx].refcnt++; 
     filp[fp].vidx = vidx;
     filp[fp].refcnt++;
-    vtab[vidx].refcnt++; 
+    client->fd[fd] = fp;
     msg->pipe.fdi = fd;
 
     /* output */
@@ -297,11 +305,10 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
         msg->pipe.result = -1;
         return;
     }
-    client->fd[fd] = fp;
+    vtab[vidx].refcnt++;
     filp[fp].vidx = vidx;
     filp[fp].refcnt++;
-    vtab[vidx].refcnt++;
- 
+    client->fd[fd] = fp;
     msg->pipe.fdo = fd;
 
     msg->pipe.result = 0;
@@ -339,19 +346,23 @@ do_open (vfs_task_t *client, vfsmsg_t *msg) {
     if (fd < 0) {
         msg->openclose.fd = -1;
         return;
-    }
-
-    client->fd[fd] = fp;
-    filp[fp].pos = 0;
-    filp[fp].vidx = vidx;
-    filp[fp].refcnt++;
-    vtab[vidx].refcnt++;
+    }    
 
     /* Get the node */
     msg->cmd = VFS_IGET;
     msg->iget.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
-    vtab[vidx].mode = msg->iget.mode;
+    if (msg->iget.ino < 0) {
+        /* Node not found on dev */
+        msg->openclose.fd = -1;
+        return;
+    }
+    vtab[vidx].refcnt++;
+    
+    filp[fp].pos = 0;
+    filp[fp].vidx = vidx;
+    filp[fp].refcnt++;
+    client->fd[fd] = fp;
 
     msg->openclose.fd = fd;
     return;
@@ -383,13 +394,17 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
 
     /* No more refs, close this node */
     msg->cmd = VFS_IPUT;
-    msg->iput.ino = vtab[vidx].ino;
+    msg->iget.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+
     vtab[vidx].refcnt -= 1;
     while (msg->cmd == VFS_REPEAT) {
         /* Unblocking waiting tasks(s) */
         send(msg->client, msg);
         sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    }
+    if (msg->iget.ino < 0) {
+        return; /* Node not found on dev */
     }
 
     return;
@@ -409,10 +424,10 @@ do_rw (vfs_task_t *client, vfsmsg_t *msg) {
         return;
     }
     vidx = filp[client->fd[fd]].vidx;
-    msg->rw.ino = vtab[vidx].ino;
-    /* no need for FD from this point */
 
+    msg->rw.ino = vtab[vidx].ino;
     msg->rw.pos = filp[client->fd[fd]].pos;
+
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
     while (msg->cmd == VFS_REPEAT) {
         /* Unblocking waiting tasks(s) */
@@ -510,9 +525,7 @@ vfs (void* args UNUSED) {
     vfs_task_t *vfs_client;
     vfsmsg_t msg;
 
-
     vfs_init();
-    /* Let's go! */
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -661,11 +674,10 @@ mkdev (void(*p)(void* args), void* args) {
  */
 
 int
-mknod (int dev, char* name, mode_t mode) {
+mknod (int dev, char* name) {
     vfsmsg_t msg;
     msg.cmd = VFS_MKNOD;
-    msg.mknod.id = dev;
-    msg.mknod.mode = mode;
+    msg.mknod.dev = dev;
     msg.mknod.name = name;
     sendrec(vfstask, &msg, sizeof(msg));
     return (msg.mknod.ino);
