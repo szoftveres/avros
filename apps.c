@@ -23,7 +23,7 @@ getty (char** argv) {
     args[1] = NULL;
 
     /* stdin, stdout, stderr */
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i != 3; i++) {
         close(i);
         if (open(argv[1]) < 0) {
             return (-1);

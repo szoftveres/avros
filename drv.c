@@ -167,10 +167,10 @@ dputu (unsigned int num) {
 #define MF_MAX_NODES 8
 
 typedef struct mfnode_s {
-    char    file[128];
-    int     size;
     char    refcnt;
     char    links;
+    char    file[128];
+    int     size;
 } mfnode_t;
 
 int
@@ -359,7 +359,7 @@ void pipedev (void* args UNUSED) {
                 while (!Q_EMPTY(nodes[msg.iget.ino]->msgs)) {
                     msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.iget.ino]->msgs);
                     msg_p->rw.data = EOF;
-                    msg.rw.bnum = 0;
+                    msg_p->rw.bnum = 0;
                     msg_p->cmd = VFS_REPEAT;
                     sendrec(client, msg_p, sizeof(vfsmsg_t));
                     kfree(Q_REMV(&(nodes[msg.iget.ino]->msgs), msg_p));
@@ -413,7 +413,7 @@ void pipedev (void* args UNUSED) {
                     }
                     /* release waiting task */
                     msg_p->cmd = VFS_REPEAT;
-                    msg.rw.bnum = 0;
+                    msg_p->rw.bnum = 0;
                     sendrec(client, msg_p, sizeof(vfsmsg_t));
                     kfree(Q_REMV(&(nodes[msg.rw.ino]->msgs), msg_p));
                 }

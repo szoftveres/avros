@@ -103,7 +103,7 @@ typedef struct openclose_s {
  * STAT
  */
 
-typedef struct stat_s {
+typedef union stat_u {
     struct {
         char*           name;         /* fname */
     } ask;
@@ -172,11 +172,11 @@ typedef struct dup_s {
 /*
  *
  */
-typedef union iget_u {
+typedef struct iget_s {
     int         ino;
 } iget_t;
 
-typedef union link_u {
+typedef struct link_s {
         int     ino;
 } link_t;
 

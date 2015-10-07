@@ -38,8 +38,8 @@ init (char** argv UNUSED) {
     };    
 
     while (1) {
-        for (i=0;i<(sizeof(session)/sizeof(session[0])); i++) {
-            if((!session[i].pid) && (session[i].name)){
+        for (i = 0; i<(sizeof(session)/sizeof(session[0])); i++) {
+            if ((!session[i].pid) && (session[i].name)) {
                 memset(session_arg, 0, sizeof(session_arg));
                 session_arg[0] = session[i].name;
                 session_arg[1] = session[i].arg;
@@ -47,8 +47,8 @@ init (char** argv UNUSED) {
             }
         }
         pid = wait(NULL);
-        for (i=0;i<(sizeof(session)/sizeof(session[0])); i++) {
-            if(session[i].pid == pid){
+        for (i = 0; i<(sizeof(session)/sizeof(session[0])); i++) {
+            if (session[i].pid == pid) {
                 session[i].pid = NULL;
                 break;
             }
