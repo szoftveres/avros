@@ -210,7 +210,7 @@ do_mknod (vfsmsg_t *msg) {
 
     /* Link the node */
     msg->cmd = VFS_LINK;
-    msg->iget.ino = ino;
+    msg->link.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
 
     msg->mknod.ino = ino;
@@ -264,6 +264,8 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     msg->cmd = VFS_IGET; 
     msg->iget.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    msg->cmd = VFS_IGET; 
+    msg->iget.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
     vtab[vidx].mode = msg->iget.mode;
     
@@ -383,12 +385,12 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
     msg->cmd = VFS_IPUT;
     msg->iput.ino = vtab[vidx].ino;
     sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
+    vtab[vidx].refcnt -= 1;
     while (msg->cmd == VFS_REPEAT) {
         /* Unblocking waiting tasks(s) */
         send(msg->client, msg);
         sendrec(devtab[vtab[vidx].dev], msg, sizeof(vfsmsg_t));
     }
-    vtab[vidx].refcnt -= 1;
 
     return;
 }

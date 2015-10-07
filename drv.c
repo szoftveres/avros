@@ -200,7 +200,7 @@ void memfile (void* args UNUSED) {
             break;
 
           case VFS_LINK:
-            nodes[msg.link.ask.ino]->links += 1;
+            nodes[msg.link.ino]->links += 1;
             break;
           case VFS_UNLINK:
             nodes[msg.unlink.ask.ino]->links -= 1;
@@ -304,7 +304,7 @@ void pipedev (void* args UNUSED) {
 
 
           case VFS_LINK:
-            nodes[msg.link.ask.ino]->links += 1;
+            nodes[msg.link.ino]->links += 1;
             break;
           case VFS_UNLINK:
             nodes[msg.unlink.ask.ino]->links -= 1;
@@ -323,29 +323,41 @@ void pipedev (void* args UNUSED) {
             break;
           case VFS_IPUT:
             nodes[msg.iput.ino]->refcnt -= 1;
+
+            /*
+             * One end detached and no links, notify
+             * waiting tasks and empty pipe
+             */
+            if (nodes[msg.iput.ino]->refcnt == 1) {
+                while (!Q_EMPTY(nodes[msg.iput.ino]->msgs)) {
+                    msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.iput.ino]->msgs);
+                    msg_p->rw.data = EOF;
+                    msg.rw.bnum = 0;
+                    msg_p->cmd = VFS_REPEAT;
+                    sendrec(client, msg_p, sizeof(vfsmsg_t));
+                    kfree(Q_REMV(&(nodes[msg.iput.ino]->msgs), msg_p));
+                }
+                break;
+            }
+
             if (nodes[msg.iput.ino]->refcnt) {
                 /* more refs */
                 break;
-            }
-            while (!Q_EMPTY(nodes[msg.iput.ino]->msgs)) {
-                msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.iput.ino]->msgs);
-                msg_p->rw.data = EOF;
-                msg_p->cmd = VFS_REPEAT;
-                sendrec(client, msg_p, sizeof(vfsmsg_t));
-                kfree(Q_REMV(&(nodes[msg.iput.ino]->msgs), msg_p));
             }
 
             if (nodes[msg.iput.ino]->links) {
                 /* More links, don't destroy */
                 break;
             }
+
             kfree(nodes[msg.iput.ino]);
             nodes[msg.iput.ino] = NULL;
             break;
           case VFS_WRITEC:
           case VFS_READC:
             if (Q_EMPTY(nodes[msg.rw.ino]->msgs)) {   /* Empty pipe */
-                if (nodes[msg.rw.ino]->refcnt <= 1) {
+                if ((nodes[msg.rw.ino]->refcnt <= 1) &&
+                    (!nodes[msg.rw.ino]->links)) {
                     /* Other end detached, send EOF */
                     msg.rw.data = EOF;
                 } else {

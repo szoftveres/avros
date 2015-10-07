@@ -194,9 +194,7 @@ typedef union iput_u {
 
 
 typedef union link_u {
-    struct {
         int     ino;
-    } ask;
 } link_t;
 
 typedef union unlink_u {
