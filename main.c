@@ -3,7 +3,7 @@
 #include "vfs.h"
 #include "drv.h"
 #include "sema.h"
-#include "timer.h"
+#include "ts.h"
 #include "pm.h"
 #include "es.h"
 #include "init.h"
@@ -24,9 +24,9 @@ startup (void* args UNUSED) {
     /* starting time server */
     pid = cratetask(TASK_PRIO_RT, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE);
-    setuptask(pid, timer, NULL, NULL);
+    setuptask(pid, ts, NULL, NULL);
     starttask(pid);
-    settimerpid(pid);
+    settspid(pid);
 
     /* starting virtual filesystem server */
     pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);

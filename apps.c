@@ -3,7 +3,7 @@
 #include "apps.h"
 #include "misc.h"
 #include "sema.h"
-#include "timer.h"
+#include "ts.h"
 #include "pm.h"
 #include "vfs.h"  /* EOF */
 #include "es.h"

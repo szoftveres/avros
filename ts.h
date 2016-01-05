@@ -10,8 +10,8 @@ typedef struct time_s {
 } time_t;
 
 
-void timer (void* args);
-pid_t settimerpid (pid_t pid);
+void ts (void* args);
+pid_t settspid (pid_t pid);
 
 void delay (int ticks);
 void getuptime (time_t* time);
