@@ -8,40 +8,32 @@
 #define MAX_FD          (8)
 
 enum {   
-    VFS_NONE,
-    VFS_INTERRUPT,
-    VFS_DONTREPLY,
+    /* Answer types */
+    VFS_HOLD,
     VFS_REPEAT,
-    VFS_ANSWER,
+    VFS_FINAL,
 
-    VFS_STAT,
-
-    VFS_MKDEV,
-
-    VFS_MKNOD,
-    VFS_RMNOD,
-
-    VFS_DUP,
-
+    /* Query types */
+    VFS_INTERRUPT,
 
     VFS_IGET,
     VFS_IPUT,
-
     VFS_LINK,
     VFS_UNLINK,
-    
 
+    VFS_MKNOD,
+    VFS_MKDEV,
+
+    VFS_STAT,
+    VFS_DUP,
     VFS_PIPE,
-
     VFS_OPEN,
     VFS_CLOSE,
     VFS_CREAT,
-
-    VFS_READC,                  /* char read */
-    VFS_WRITEC,                 /* char write */
-
-    VFS_ADDTASK,                /* Add taks */
-    VFS_DELTASK                 /* Del task */
+    VFS_READC,
+    VFS_WRITEC,
+    VFS_ADDTASK,
+    VFS_DELTASK
 };
 
 /*

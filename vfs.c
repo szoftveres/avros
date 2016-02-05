@@ -335,6 +335,7 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
     sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
 
     while (msg->cmd == VFS_REPEAT) {
+        msg_p->cmd = VFS_FINAL;
         /* Unblocking waiting tasks(s) */
         send(msg->client, msg);
         sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
@@ -371,6 +372,7 @@ do_rw (vfs_task_t *client, vfsmsg_t *msg) {
     sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
 
     while (msg->cmd == VFS_REPEAT) {
+        msg->cmd = VFS_FINAL;
         /* Unblocking waiting tasks(s) */
         send(msg->client, msg);
         sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
@@ -520,7 +522,8 @@ vfs (void* args UNUSED) {
             do_rw(vfs_client, &msg);
             break;
         }
-        if (msg.cmd != VFS_DONTREPLY) {
+        if (msg.cmd != VFS_HOLD) {
+            msg.cmd = VFS_FINAL;
             send(client, &msg);
         }
     }

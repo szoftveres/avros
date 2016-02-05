@@ -97,7 +97,7 @@ void usart0 (void* args UNUSED) {
                 elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
                 memcpy(elem, &msg, sizeof(msg));
                 Q_END(&rd_q, elem);
-                msg.cmd = VFS_DONTREPLY;
+                msg.cmd = VFS_HOLD;
             }
             msg.rw.bnum = 0;
             break;
@@ -119,7 +119,7 @@ void usart0 (void* args UNUSED) {
                     elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
                     memcpy(elem, &msg, sizeof(msg));
                     Q_END(&rd_q, elem);
-                    msg.cmd = VFS_DONTREPLY;
+                    msg.cmd = VFS_HOLD;
                 }
                 break;
             }
@@ -364,8 +364,6 @@ void pipedev (void* args UNUSED) {
                     sendrec(client, msg_p, sizeof(vfsmsg_t));
                     kfree(Q_REMV(&(nodes[msg.iget.ino]->msgs), msg_p));
                 }
-                /* Must not be repeat once done */
-                msg_p->cmd = VFS_ANSWER;
                 break;
             }
 
@@ -394,7 +392,7 @@ void pipedev (void* args UNUSED) {
                     msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
                     memcpy(msg_p, &msg, sizeof(vfsmsg_t));
                     Q_END(&(nodes[msg.rw.ino]->msgs), msg_p);
-                    msg.cmd = VFS_DONTREPLY;
+                    msg.cmd = VFS_HOLD;
                 }
             } else {        /* Read or Write requests in the pipe */
                 msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.rw.ino]->msgs);
@@ -403,7 +401,7 @@ void pipedev (void* args UNUSED) {
                     msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
                     memcpy(msg_p, &msg, sizeof(vfsmsg_t));
                     Q_END(&(nodes[msg.rw.ino]->msgs), msg_p);
-                    msg.cmd = VFS_DONTREPLY;
+                    msg.cmd = VFS_HOLD;
                 } else {
                     switch (msg_p->cmd) {
                       case VFS_READC:
@@ -418,7 +416,6 @@ void pipedev (void* args UNUSED) {
                     msg_p->rw.bnum = 0;
                     sendrec(client, msg_p, sizeof(vfsmsg_t));
                     kfree(Q_REMV(&(nodes[msg.rw.ino]->msgs), msg_p));
-                    msg_p->cmd = VFS_ANSWER;
                 }
             }
             msg.rw.bnum = 0;
