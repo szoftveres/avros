@@ -9,7 +9,7 @@
 
 int
 mgetc (void) {
-    return (readc(0));
+    return (readc(STDIN));
 }
 
 /*
@@ -120,7 +120,7 @@ getopt (char* argv[], char* opts, getopt_p opt_p) {
     }
 	c = argv[opt_p->optind][opt_p->sp];
 	if ((c == ':') || ((cp=strchr(opts, c)) == NULL)) {
-        mfprintf(2, "%s: -%c?\n", argv[0], c);
+        mfprintf(STDERR, "%s: -%c?\n", argv[0], c);
 		if (argv[opt_p->optind][++opt_p->sp] == '\0') {
 			opt_p->optind++;
 			opt_p->sp = 1;
@@ -131,7 +131,7 @@ getopt (char* argv[], char* opts, getopt_p opt_p) {
 		if (argv[opt_p->optind][opt_p->sp+1] != '\0') {
 			opt_p->optarg = &argv[opt_p->optind++][opt_p->sp+1];
         } else if (++opt_p->optind >= argc(argv)) {
-		    mfprintf(2, "%s: -%c needs arg\n", argv[0], c);
+		    mfprintf(STDERR, "%s: -%c needs arg\n", argv[0], c);
 			opt_p->sp = 1;
 			return ('?');
 		} else {
@@ -151,16 +151,16 @@ getopt (char* argv[], char* opts, getopt_p opt_p) {
 
 
 void unknown(char** argv, const char* s) {
-    mfprintf(2, "%s: %s?\n", argv[0], s);
+    mfprintf(STDERR, "%s: %s?\n", argv[0], s);
 }
 
 void noargs(char** argv) {
-    mfprintf(2, "%s: args?\n", argv[0]);
+    mfprintf(STDERR, "%s: args?\n", argv[0]);
 }
 
 void massert (int val, char* file, int line) {
     if (!val) {
-        mfprintf(2, "[%s:%d] assert fail\n", file, line);
+        mfprintf(STDERR, "[%s:%d] assert fail\n", file, line);
         mexit(-1);
     }
 }

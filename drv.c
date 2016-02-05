@@ -21,11 +21,14 @@ void usart0_event (void* args UNUSED) {
     kirqdis();
 
     while(!(UCSR0A & (1<<UDRE0))) yield();
-    UDR0 = (unsigned char) 0;
+    if (!(UCSR0A & (1<<TXC0))) {
+        /* Generate the first TXC interrupt */
+        UCSR0A |= (1<<TXC0);
+    }
 
     while (1) {
-        UCSR0B |= (1<<RXCIE0);      /* Enable RXC interrupt */
-        UCSR0B |= (1<<TXCIE0); /* Enable TXC interrupt */
+        UCSR0B |= (1<<RXCIE0); /* Re-Enable RXC interrupt */
+        UCSR0B |= (1<<TXCIE0); /* Re-Enable TXC interrupt */
         switch (waitevent(EVENT_USART0RX | EVENT_USART0TX)) {
           case EVENT_USART0RX:
             UCSR0B &= ~(1<<RXCIE0); /* Disable RXC interrupt */

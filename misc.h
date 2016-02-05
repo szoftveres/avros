@@ -1,6 +1,13 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+enum {
+    STDIN = 0,
+    STDOUT,
+    STDERR,
+    /* Must be the last one */
+    STDMAX
+};
 
 
 void mfputc (int fd, int data);
