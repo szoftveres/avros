@@ -81,7 +81,7 @@ exec_job (char** argv) {
      * This is mandatory because shell keeps the other
      * end of the pipe and this process inherits it
      */
-    for (i = 3; i < MAX_FD; i++) {
+    for (i = 3; i != MAX_FD; i++) {
         close(i);
     }
 
@@ -217,7 +217,7 @@ execute (char interactive, char direct, char* line, char** argv) {
     pmfree(job);							/* deleting buffer */
     wait(&code);
     if (direct && interactive) {
-        mfprintf(3, " (%d)\n", code);
+        mfprintf(2, " (%d)\n", code);   /* stderr */
     }
     return (code);
 }
@@ -267,8 +267,8 @@ sh (char** argv) {
     nextin = dup(0); /* 3 = stdin  */
     dup(1);          /* 4 = stdout */
     JOB_INIT
-
     dup(0);          /* 5 needed by pipe */
+
     if (argv[1]) {
         if ((fin = open(argv[1])) < 0) {
             unknown(argv, argv[1]);
@@ -286,7 +286,7 @@ sh (char** argv) {
         ASSERT(cmdline);
         if (getcmd(fin, cmdline, MAX_CMDLINE) == EOF) {
             if (fin == 0) {
-                mfprintf(1, "\nExit\n");
+                mfprintf(2, "\nExit\n");
             }
 			mexit(0);
         }

@@ -53,6 +53,7 @@ startup (void* args UNUSED) {
     es_regprg("sh",         sh,             DEFAULT_STACK_SIZE+64);
     es_regprg("echo",       echo,           DEFAULT_STACK_SIZE);
     es_regprg("cat",        cat,            DEFAULT_STACK_SIZE);
+    es_regprg("cap",        cap,            DEFAULT_STACK_SIZE);
     es_regprg("sleep",      sleep,          DEFAULT_STACK_SIZE);
     es_regprg("xargs",      xargs,          DEFAULT_STACK_SIZE);
     es_regprg("at",         at,             DEFAULT_STACK_SIZE);

@@ -12,6 +12,7 @@ int getty(char** argv);
 int echo(char** argv);
 
 int cat(char** argv);
+int cap(char** argv);
 
 int sleep (char** argv);
 

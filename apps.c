@@ -126,6 +126,43 @@ cat (char** argv) {
 ================================================================================
 */
 
+void
+docap (void) {
+    int c;
+    while((c = mgetc()) != EOF) {
+        if (c >= 'a' && c <= 'z') {
+            c = c - ('a' - 'A');
+        }
+        mfputc(1, c);
+    }
+}
+
+/**
+*/
+
+int
+cap (char** argv) {
+    int i;
+    if (!argv[1]) {
+        docap();
+        return (0);
+    }
+    for (i=1; argv[i]; i++) {
+        close(0); /* stdin */
+        if(open(argv[i]) < 0){
+            unknown(argv, argv[i]);
+            return (-1);
+        }
+        docap();
+    }
+    return (0);
+}
+
+
+/*
+================================================================================
+*/
+
 int
 sleep (char** argv) {
     if (argc(argv) < 2) {

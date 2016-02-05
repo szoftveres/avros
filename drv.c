@@ -9,11 +9,6 @@
  */
 
 
-void usart0_wr (int data) {
-    while(!(UCSR0A & (1<<UDRE0))) yield();
-    UDR0 = (unsigned char) data;
-}
-
 void usart0_event (void* args UNUSED) {
     vfsmsg_t     msg;
     pid_t       driver;
@@ -25,9 +20,12 @@ void usart0_event (void* args UNUSED) {
 
     kirqdis();
 
+    while(!(UCSR0A & (1<<UDRE0))) yield();
+    UDR0 = (unsigned char) 0;
+
     while (1) {
         UCSR0B |= (1<<RXCIE0);      /* Enable RXC interrupt */
-/*XXX*/ //   UCSR0B |= (1<<TXCIE0); /* Enable TXC interrupt */
+        UCSR0B |= (1<<TXCIE0); /* Enable TXC interrupt */
         switch (waitevent(EVENT_USART0RX | EVENT_USART0TX)) {
           case EVENT_USART0RX:
             UCSR0B &= ~(1<<RXCIE0); /* Disable RXC interrupt */
@@ -73,7 +71,7 @@ void usart0 (void* args UNUSED) {
           case VFS_MKDEV: {
                 pid_t       task;
                 task = cratetask(TASK_PRIO_RT, PAGE_INVALID);
-                allocatestack(task, DEFAULT_STACK_SIZE);
+                allocatestack(task, DEFAULT_STACK_SIZE-64);
                 setuptask(task, usart0_event, NULL, NULL);
                 starttask(task);
                 msg.client = client;
@@ -101,17 +99,29 @@ void usart0 (void* args UNUSED) {
             }
             msg.rw.bnum = 0;
             break;
-          
+          case VFS_WRITEC:
+            elem = (vfsmsg_t*)(Q_FIRST(wr_q));
+            if (elem && elem->cmd == VFS_INTERRUPT) {
+                UDR0 = (unsigned char) msg.rw.data;
+                kfree(Q_REMV(&wr_q, elem));
+            } else {
+                elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+                memcpy(elem, &msg, sizeof(msg));
+                Q_END(&wr_q, elem);
+                msg.cmd = VFS_HOLD;
+            }
+            msg.rw.bnum = 0;
+            break; 
           case VFS_INTERRUPT:
             switch (msg.interrupt.cmd) {
               case VFS_READC:
-                if(msg.interrupt.data == 0x04){ /* Ctrl + D */
+                if (msg.interrupt.data == 0x04) { /* Ctrl + D */
                     msg.interrupt.data = EOF;
-                }else{ 
-                    usart0_wr(msg.interrupt.data); /* ECHO */
+                //} else { 
+                //    ; /* ECHO */
                 }
                 elem = (vfsmsg_t*)(Q_FIRST(rd_q));
-                if (elem && elem->cmd == VFS_READC) {
+                if (elem && elem->cmd == msg.interrupt.cmd) {
                     msg.client = elem->client;
                     msg.rw.data = msg.interrupt.data;
                     kfree(Q_REMV(&rd_q, elem));
@@ -122,40 +132,24 @@ void usart0 (void* args UNUSED) {
                     msg.cmd = VFS_HOLD;
                 }
                 break;
+              case VFS_WRITEC:
+                elem = (vfsmsg_t*)(Q_FIRST(wr_q));
+                if (elem && elem->cmd == msg.interrupt.cmd) {
+                    msg.client = elem->client;
+                    UDR0 = (unsigned char) elem->rw.data;
+                    kfree(Q_REMV(&wr_q, elem));
+                } else {
+                    elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+                    memcpy(elem, &msg, sizeof(msg));
+                    Q_END(&wr_q, elem);
+                    msg.cmd = VFS_HOLD;
+                }
+                break;
             }
             break;
-
-          case VFS_WRITEC:
-            usart0_wr(msg.rw.data);
-            msg.rw.bnum = 0;
-            break; 
         }
         send(client, &msg);
     }
-}
-
-
-
-
-void
-dputc (int data) {
-     usart0_wr(data);
-     //data = data;
-}
-
-void
-dputs (const char* str) {
-    while(*str){
-        dputc(*str++);
-    };
-}
-
-void
-dputu (unsigned int num) {
-    if(num/10){
-        dputu(num/10);
-    }
-    dputc((num%10) + '0');
 }
 
 
@@ -188,6 +182,7 @@ void memfile (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
     mfnode_t** nodes = (mfnode_t**)kmalloc(sizeof(mfnode_t*) * MF_MAX_NODES); 
+    memset(nodes, 0, (sizeof(mfnode_t*) * MF_MAX_NODES));
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -300,7 +295,6 @@ void pipedev (void* args UNUSED) {
     vfsmsg_t* msg_p; /* Temporary pointer */
 
     pdnode_t** nodes = (pdnode_t**)kmalloc(sizeof(pdnode_t*) * PD_MAX_NODES);
-    
     memset(nodes, 0, (sizeof(pdnode_t*) * PD_MAX_NODES));
 
     while (1) {

@@ -335,7 +335,7 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
     sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
 
     while (msg->cmd == VFS_REPEAT) {
-        msg_p->cmd = VFS_FINAL;
+        msg->cmd = VFS_FINAL;
         /* Unblocking waiting tasks(s) */
         send(msg->client, msg);
         sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
@@ -436,7 +436,7 @@ vfs_addnewtask (vfsmsg_t *msg) {
     memset(pt, 0x00, sizeof(vfs_task_t));
     Q_END(&vfs_task_q, pt);
     pt->pid = msg->adddel.pid;
-    for (i = 0; i < MAX_FD; i++) {
+    for (i = 0; i != MAX_FD; i++) {
         pt->fd[i] = (-1);
     }
     if (!msg->adddel.parent) {
@@ -449,7 +449,7 @@ vfs_addnewtask (vfsmsg_t *msg) {
         msg->adddel.pid = NULL;
         return;
     }
-    for (i = 0; i < MAX_FD; i++) {
+    for (i = 0; i != MAX_FD; i++) {
         if (parent->fd[i] >= 0) {
             pt->fd[i] = parent->fd[i];
             filp[pt->fd[i]].refcnt++;
