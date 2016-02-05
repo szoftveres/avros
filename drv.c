@@ -364,6 +364,8 @@ void pipedev (void* args UNUSED) {
                     sendrec(client, msg_p, sizeof(vfsmsg_t));
                     kfree(Q_REMV(&(nodes[msg.iget.ino]->msgs), msg_p));
                 }
+                /* Must not be repeat once done */
+                msg_p->cmd = VFS_ANSWER;
                 break;
             }
 
@@ -416,6 +418,7 @@ void pipedev (void* args UNUSED) {
                     msg_p->rw.bnum = 0;
                     sendrec(client, msg_p, sizeof(vfsmsg_t));
                     kfree(Q_REMV(&(nodes[msg.rw.ino]->msgs), msg_p));
+                    msg_p->cmd = VFS_ANSWER;
                 }
             }
             msg.rw.bnum = 0;

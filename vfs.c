@@ -211,13 +211,16 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     msg->cmd = VFS_IGET; 
     msg->iget.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
+
     if (msg->iget.ino < 0) {
         msg->pipe.result = -1;
         return; /* Cannot get node */
     }
+
     msg->cmd = VFS_IGET; 
     msg->iget.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
+
     if (msg->iget.ino < 0) {
         msg->pipe.result = -1;
         return; /* Cannot get node */
@@ -289,6 +292,7 @@ do_open (vfs_task_t *client, vfsmsg_t *msg) {
     msg->cmd = VFS_IGET;
     msg->iget.ino = filp[fp].ino;
     sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
+
     if (msg->iget.ino < 0) {
         /* Node not found on dev */
         msg->openclose.fd = -1;
@@ -328,7 +332,6 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
     /* No more refs, close this node */
     msg->cmd = VFS_IPUT;
     msg->iget.ino = filp[fp].ino;
-
     sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
 
     while (msg->cmd == VFS_REPEAT) {

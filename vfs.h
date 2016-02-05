@@ -12,6 +12,7 @@ enum {
     VFS_INTERRUPT,
     VFS_DONTREPLY,
     VFS_REPEAT,
+    VFS_ANSWER,
 
     VFS_STAT,
 
