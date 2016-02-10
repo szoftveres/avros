@@ -30,8 +30,6 @@ void* pmmalloc (size_t size);
 
 void pmfree (void* ptr);
 
-void pmreg (pid_t pid);
-
 int argc(char** argv);
 
 #endif

@@ -4,9 +4,6 @@
 #include "kernel.h"
 #include "queue.h"
 
-/*
-============================================================
-*/
 
 typedef struct pm_task_s {
     QUEUE_HEADER
@@ -22,30 +19,16 @@ typedef struct pm_task_s {
 
 #define PM_PIDOF(p) ((p) ? ((p)->pid) : (NULL))
 
-/*
- *
- */
-
 static q_head_t task_q;
 static q_head_t wait_q;
 static q_head_t zombie_q;
 
 #define PM_CLIENT       ((pm_task_t*)(Q_FIRST(task_q)))
 
-
-
-/*
-============================================================
-*/
-
-
-
 /*
  * PM COMMANDS
  */
-
 enum {
-    PM_REG,
     PM_SPAWN,
     PM_EXEC,
     PM_WAIT,
@@ -57,7 +40,6 @@ enum {
 /*
  * SPAWN
  */
-
 typedef union spawn_u {
     struct {
         int(*ptp)(char**);              /* task entry */
@@ -72,7 +54,6 @@ typedef union spawn_u {
 /*
  * EXEC
  */
-
 typedef union exec_u {
     struct {
         char*           name;           /* prg name */
@@ -85,7 +66,6 @@ typedef union exec_u {
 /*
  * EXIT
  */
-
 typedef struct exit_s {
     int code;                       /* exit code */
 } exit_t;
@@ -93,7 +73,6 @@ typedef struct exit_s {
 /*
  * WAIT
  */
-
 typedef union wait_s {
     struct {
         pid_t pid;                      /* pid */
@@ -107,7 +86,6 @@ typedef union wait_s {
 /*
  * MALLOC
  */
-
 typedef union pmmalloc_u {
     struct {
         size_t          size;           /* size */
@@ -121,32 +99,13 @@ typedef union pmmalloc_u {
 /*
  * FREE
  */
-
 typedef struct pmfree_s {
     void*           ptr;            /* pointer */
 } pmfree_t;
 
-
-/*
- * KILL
- */
-
-typedef struct kill_s {
-    pid_t pid;                      /* pid */
-} kill_t;
-
-/*
- * REGISTER
- */
-
-typedef struct register_s {
-    pid_t pid;                      /* pid */
-} register_t;
-
 /*
  *
  */
-
 typedef struct pmmsg_s {
     int cmd;
     union {
@@ -155,22 +114,13 @@ typedef struct pmmsg_s {
         exit_t          exit;           /* exit */
         wait_t          wait;           /* wait */
         pmmalloc_t      malloc;         /* malloc */
-        register_t      reg;            /* register */
         pmfree_t        free;           /* free */
     };
 } pmmsg_t;
 
-
-/*
-============================================================
-*/
-
-
-
 /*
  * pid: task's own pid in kernel
  */
-
 static pm_task_t*
 pm_newtask (pid_t pid, pm_task_t* parent) {
     pm_task_t* pt;
@@ -188,7 +138,6 @@ pm_newtask (pid_t pid, pm_task_t* parent) {
 /*
  *
  */
-
 static pm_task_t*
 pm_findbypid (pid_t pid) {
     pm_task_t *it = (pm_task_t*)Q_FIRST(task_q);
@@ -201,51 +150,51 @@ pm_findbypid (pid_t pid) {
     return (it);
 }
 
-/**
+/*
  * Check whether ptsk is the child of PM_CLIENT
  */
 static q_item_t*
 pm_haschild (q_head_t* que UNUSED, q_item_t* ptsk) {
-    if(((pm_task_t*)ptsk)->parent != PM_CLIENT) {
+    if (((pm_task_t*)ptsk)->parent != PM_CLIENT) {
 		return NULL;
     }
     return (ptsk);
 }
 
-/**
+/*
  * Check whether ptsk is the child of PM_CLIENT, and PM_CLIENT is
  * waiting for it (ar any)
  */
 static q_item_t*
 pm_findzombie (q_head_t* que UNUSED, q_item_t* ptsk) {
-    if(((pm_task_t*)ptsk)->parent != PM_CLIENT) {
+    if (((pm_task_t*)ptsk)->parent != PM_CLIENT) {
         return NULL;
     }
-    if(((PM_CLIENT->waitfor != PM_PIDOF(((pm_task_t*)ptsk)))
-        && (PM_CLIENT->waitfor != TASK_ANY))){
+    if (((PM_CLIENT->waitfor != PM_PIDOF(((pm_task_t*)ptsk)))
+         && (PM_CLIENT->waitfor != TASK_ANY))){
         return (NULL);
 	}
     return (ptsk);
 }
 
-/**
+/*
  * Check whether ptsk is the child of PM_CLIENT and make it orphan
  */
 static q_item_t*
 pm_makechildorphan (q_head_t* que UNUSED, q_item_t* ptsk) {
-    if(((pm_task_t*)ptsk)->parent != PM_CLIENT) {
+    if (((pm_task_t*)ptsk)->parent != PM_CLIENT) {
         return (NULL);
     }
     ((pm_task_t*)ptsk)->parent = (NULL); /* the task has no parent anymore */
     return (NULL);
 }
 
-/**
+/*
  * Check whether ptsk is the child of PM_CLIENT and remove it
  */
 static q_item_t*
 pm_removechild (q_head_t* que, q_item_t* ptsk) {
-    if(((pm_task_t*)ptsk)->parent != PM_CLIENT) {
+    if (((pm_task_t*)ptsk)->parent != PM_CLIENT) {
         return (NULL);
     }
     kfree(((pm_task_t*)ptsk)->args);
@@ -253,21 +202,20 @@ pm_removechild (q_head_t* que, q_item_t* ptsk) {
     return (NULL);
 }
 
-/**
+/*
  * check whether ptsk is the parent of PM_CLIENT
  */
 static q_item_t*
 pm_findmyparent (q_head_t* que UNUSED, q_item_t* ptsk) {
-    if(PM_CLIENT->parent != ((pm_task_t*)ptsk)) {
+    if (PM_CLIENT->parent != ((pm_task_t*)ptsk)) {
         return (NULL);
     }
     return (ptsk);
 }
 
 /*
-============================================================
-*/
-
+ *
+ */
 typedef struct mem_chunk_s {
     QUEUE_HEADER
     void*               ptr;
@@ -277,7 +225,6 @@ typedef struct mem_chunk_s {
 /*
  *
  */
-
 static mem_chunk_t*
 findchunk (pm_task_t* ptsk, void* ptr) {
     mem_chunk_t *it;
@@ -286,7 +233,7 @@ findchunk (pm_task_t* ptsk, void* ptr) {
     }
     it = (mem_chunk_t*) Q_FIRST(ptsk->chunk_q);
     while (it) {
-        if(it->ptr == ptr){
+        if (it->ptr == ptr) {
             break;
         }
         it = (mem_chunk_t*) Q_NEXT(it);
@@ -297,7 +244,6 @@ findchunk (pm_task_t* ptsk, void* ptr) {
 /*
  *
  */
-
 static q_item_t*
 pm_delchunks (q_head_t* que, q_item_t* chunk) {
     if (((mem_chunk_t*)chunk)->ptr) {
@@ -307,10 +253,45 @@ pm_delchunks (q_head_t* que, q_item_t* chunk) {
     return NULL;
 }
 
-/*
-============================================================
-*/
 
+/*
+ *
+ */
+void
+do_pmalloc (pmmsg_t* msg) {
+
+    mem_chunk_t *chunk = (mem_chunk_t*) kmalloc(sizeof(mem_chunk_t));
+    if (!chunk) {
+        msg->malloc.ans.ptr = NULL;
+        return;
+    }
+    chunk->ptr = kmalloc(msg->malloc.ask.size);
+    if (!chunk->ptr) {
+        kfree(chunk);
+        msg->malloc.ans.ptr = NULL;
+        return;
+    }
+    Q_FRONT(&(PM_CLIENT->chunk_q), chunk);
+    msg->malloc.ans.ptr = chunk->ptr;
+    return;
+}
+
+/*
+ *
+ */
+void
+do_pmfree (pmmsg_t* msg) {
+    mem_chunk_t* chunk = findchunk(PM_CLIENT, msg->free.ptr);
+    if (chunk && chunk->ptr) {
+        kfree (chunk->ptr);
+    }
+    kfree(Q_REMV(&(PM_CLIENT->chunk_q), chunk));
+    return;
+}
+
+/*
+ *
+ */
 int
 argc (char* argv[]) {
     int i;
@@ -321,12 +302,11 @@ argc (char* argv[]) {
 /*
  *
  */
-
 static size_t
 pm_argstack_size (char* orgargv[]) {
     int i;
     size_t size = 0;
-    for( i = 0; orgargv && orgargv[i]; i++){
+    for (i = 0; orgargv && orgargv[i]; i++) {
         size += (strlen(orgargv[i]) + 1);
     }
     size += (sizeof(char*) * (i + 1));
@@ -337,14 +317,13 @@ pm_argstack_size (char* orgargv[]) {
 /*
  *
  */
-
 static void
 cook_argstack (char* bottom, char* orgargv[]) {
     int i;
     int num = argc(orgargv);
     char** newargv = (char**) bottom;
-	bottom += (sizeof(char*) * (num + 1));
-	for(i=0; (i < num) && (orgargv) && (orgargv[i]); i++){
+    bottom += (sizeof(char*) * (num + 1));
+    for (i=0; (i < num) && (orgargv) && (orgargv[i]); i++) {
         newargv[i] = bottom;
 		strcpy(bottom, orgargv[i]);
 		bottom += (strlen(orgargv[i]) + 1); //  string + `\0`
@@ -353,13 +332,13 @@ cook_argstack (char* bottom, char* orgargv[]) {
 }
 
 /*
-============================================================
-*/
-
-
+ *
+ */
 static pm_task_t*
-pm_setuptask (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**),
-        char** argv) {
+pm_setuptask (pm_task_t* ptsk,
+              size_t stacksize,
+              int(*ptr)(char**),
+              char** argv) {
 
     /* exec: we may copy from the old args, so keep them */
     char** newargs;
@@ -389,9 +368,8 @@ pm_setuptask (pm_task_t* ptsk, size_t stacksize, int(*ptr)(char**),
 }
 
 /*
-============================================================
-*/
-
+ *
+ */
 void
 do_spawn (pmmsg_t* msg) {
     pid_t       task;
@@ -418,8 +396,8 @@ do_spawn (pmmsg_t* msg) {
 }
 
 /*
-*/
-
+ *
+ */
 int
 do_exec (pmmsg_t* msg) {
     int(*ptr)(char**);
@@ -440,8 +418,8 @@ do_exec (pmmsg_t* msg) {
 }
 
 /*
-*/
-
+ *
+ */
 void
 do_spawnexec (pmmsg_t* msg) {
     pid_t       task;
@@ -475,8 +453,8 @@ do_spawnexec (pmmsg_t* msg) {
 }
 
 /*
-*/
-
+ *
+ */
 int
 do_exit (pmmsg_t* msg, pid_t* replyto) {
     pm_task_t*  pm_task;
@@ -501,8 +479,8 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
     /* check whether parent task is in the waiting queue */
     pm_task = (pm_task_t*) q_forall(&wait_q, pm_findmyparent);
     if (pm_task &&
-            ((pm_task->waitfor == PM_PIDOF(PM_CLIENT)) ||
-            (pm_task->waitfor == TASK_ANY))) {
+        ((pm_task->waitfor == PM_PIDOF(PM_CLIENT)) ||
+        (pm_task->waitfor == TASK_ANY))) {
         /* parent is waiting for client (or any) */
         Q_END(&task_q, Q_REMV(&wait_q, pm_task));
         PM_CLIENT->exitcode = msg->exit.code; /* Save ExitCode from msg */
@@ -522,8 +500,8 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
 }
 
 /*
-*/
-
+ *
+ */
 int
 do_wait (pmmsg_t* msg) {
     pm_task_t*  pm_task;
@@ -550,44 +528,8 @@ do_wait (pmmsg_t* msg) {
 }
 
 /*
-*/
-
-void
-do_pmalloc (pmmsg_t* msg) {
-
-    mem_chunk_t *chunk = (mem_chunk_t*) kmalloc(sizeof(mem_chunk_t));
-    if (!chunk) {
-        msg->malloc.ans.ptr = NULL;
-        return;
-    }
-    chunk->ptr = kmalloc(msg->malloc.ask.size);
-    if(!chunk->ptr){
-        kfree(chunk);
-        msg->malloc.ans.ptr = NULL;
-        return;
-    }
-    Q_FRONT(&(PM_CLIENT->chunk_q), chunk);
-    msg->malloc.ans.ptr = chunk->ptr;
-    return;
-}
-
-/*
-*/
-
-void
-do_pmfree (pmmsg_t* msg) {
-    mem_chunk_t* chunk = findchunk(PM_CLIENT, msg->free.ptr);
-    if (chunk && chunk->ptr) {
-        kfree (chunk->ptr);
-    }
-    kfree(Q_REMV(&(PM_CLIENT->chunk_q), chunk));
-    return;
-}
-
-/*
-============================================================
-*/
-
+ *
+ */
 void
 pm (void* args) {
     pid_t msg_client;
@@ -648,13 +590,11 @@ pm (void* args) {
 /*
  *
  */
-
 static pid_t pmtask;
 
 /*
  *
  */
-
 pid_t
 setpmpid (pid_t pid) {
     pmtask = pid;
@@ -664,7 +604,6 @@ setpmpid (pid_t pid) {
 /*
  * Spawn
  */
-
 pid_t
 spawntask (int(*ptsk)(char**), size_t stacksize, char** argv) {
     pmmsg_t msg;
@@ -679,7 +618,6 @@ spawntask (int(*ptsk)(char**), size_t stacksize, char** argv) {
 /*
  * Execute
  */
-
 int
 execv (char* name, char** argv) {
     pmmsg_t msg;
@@ -693,7 +631,6 @@ execv (char* name, char** argv) {
 /*
  *
  */
-
 void
 mexit (int code) {
     pmmsg_t msg;
@@ -707,7 +644,6 @@ mexit (int code) {
 /*
  *
  */
-
 pid_t
 wait (int* code) {
     pmmsg_t msg;
@@ -723,7 +659,6 @@ wait (int* code) {
 /*
  *
  */
-
 pid_t
 waitpid (pid_t p, int* code) {
     pmmsg_t msg;
@@ -736,11 +671,9 @@ waitpid (pid_t p, int* code) {
     return (msg.wait.ans.pid);
 }
 
-
 /*
  *
  */
-
 void*
 pmmalloc (size_t size) {
     pmmsg_t msg;
@@ -753,7 +686,6 @@ pmmalloc (size_t size) {
 /*
  *
  */
-
 void
 pmfree (void* ptr) {
     pmmsg_t msg;
