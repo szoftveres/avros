@@ -10,23 +10,30 @@
 
 
 void usart0_event (void* args UNUSED) {
-    vfsmsg_t     msg;
-    pid_t       driver;
+    vfsmsg_t    msg;
     pid_t       manager;
+    pid_t       driver;
 
     driver = receive(TASK_ANY, &msg, sizeof(msg));
     manager = msg.client;
+
+    UBRR0H = 0;    /* 9600 BAUD */
+    UBRR0L = 103;  /* 9600 BAUD */
+    UCSR0C = (1<<USBS0)|(3<<UCSZ00);
+    UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+
     send(driver, &msg);
 
     kirqdis();
 
     while(!(UCSR0A & (1<<UDRE0))) yield();
-    if (!(UCSR0A & (1<<TXC0))) {
+//    if (!(UCSR0A & (1<<TXC0))) {
         /* Generate the first TXC interrupt */
-        UCSR0A |= (1<<TXC0);
-    }
+//        UCSR0A |= (1<<TXC0);
+//    }
+    UDR0 = (unsigned char) '\n';
 
-    msg.client = NULL; /* Important */
+    msg.client = driver;
     while (1) {
         UCSR0B |= (1<<RXCIE0); /* Re-Enable RXC interrupt */
         UCSR0B |= (1<<TXCIE0); /* Re-Enable TXC interrupt */
@@ -59,11 +66,6 @@ void usart0 (void* args UNUSED) {
 
     q_init(&rd_q);
     q_init(&wr_q);
-
-    UBRR0H = 0;    /* 9600 BAUD */
-    UBRR0L = 103;  /* 9600 BAUD */
-    UCSR0C = (1<<USBS0)|(3<<UCSZ00);
-    UCSR0B = (1<<RXEN0)|(1<<TXEN0);
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -155,43 +157,42 @@ void usart0 (void* args UNUSED) {
  *
  */
 
-char usart0_try_write_serve(q_head_t* wr_q, vfsmsg_t *msg, int cmd) {
+void
+usart0_try_write_serve(q_head_t* wr_q, vfsmsg_t *msg, int cmd) {
     vfsmsg_t*   elem;
 
     elem = (vfsmsg_t*)(Q_FIRST(*wr_q));
     if (elem && elem->cmd == cmd) {
-        if (!msg->client) {
-            msg->client = elem->client;
-        }
-        UDR0 = (unsigned char) msg->rw.data;
+        char i = (msg->client == getpid());
+        UDR0 = (unsigned char) (i ? elem : msg)->rw.data;
+        msg->client = (i ? elem : msg)->client;
         kfree(Q_REMV(wr_q, elem));
-        return (1);
+        msg->rw.bnum = 0;
     } else {
         elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
         memcpy(elem, msg, sizeof(vfsmsg_t));
         Q_END(wr_q, elem);
-        return (0);
+        msg->cmd = VFS_HOLD;
     }
 }
 
 
-char usart_try_read_serve(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
+void
+usart_try_read_serve(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
     vfsmsg_t*   elem;
 
     elem = (vfsmsg_t*)(Q_FIRST(*rd_q));
     if (elem && elem->cmd == cmd) {
-        if (!msg->client) {
-            msg->client = elem->client;
-        }
-        msg->rw.data = elem->interrupt.data;
+        char i = (msg->client == getpid());
+        msg->rw.data = (i ? elem : msg)->interrupt.data;
+        msg->client = (i ? elem : msg)->client;
         kfree(Q_REMV(rd_q, elem));
-        return (1);
+        msg->rw.bnum = 0;
     } else {
         elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
         memcpy(elem, &msg, sizeof(vfsmsg_t));
         Q_END(rd_q, elem);
         msg->cmd = VFS_HOLD;
-        return (0);
     }
 }
 
@@ -205,15 +206,10 @@ void term_usart0 (void* args UNUSED) {
     q_init(&rd_q);
     q_init(&wr_q);
 
-    UBRR0H = 0;    /* 9600 BAUD */
-    UBRR0L = 103;  /* 9600 BAUD */
-    UCSR0C = (1<<USBS0)|(3<<UCSZ00);
-    UCSR0B = (1<<RXEN0)|(1<<TXEN0);
-
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         
-        switch(msg.cmd){
+        switch (msg.cmd) {
 
           case VFS_MKDEV: {
                 pid_t       task;
@@ -235,11 +231,9 @@ void term_usart0 (void* args UNUSED) {
             break;
           case VFS_READC:
             usart_try_read_serve(&rd_q, &msg, VFS_RX_INTERRUPT);
-            msg.rw.bnum = 0;
             break;
           case VFS_WRITEC:
             usart0_try_write_serve(&wr_q, &msg, VFS_TX_INTERRUPT);
-            msg.rw.bnum = 0;
             break;
           case VFS_RX_INTERRUPT:
             if (msg.interrupt.data == 0x04) { /* Ctrl + D */
@@ -256,7 +250,6 @@ void term_usart0 (void* args UNUSED) {
           case VFS_TX_INTERRUPT:
             usart0_try_write_serve(&wr_q, &msg, VFS_WRITEC);
             break;
-         
         }
         send(client, &msg);
     }
