@@ -2,7 +2,6 @@
 #include "kernel.h"
 #include "apps.h"
 #include "misc.h"
-#include "sema.h"
 #include "ts.h"
 #include "pm.h"
 #include "vfs.h"  /* EOF */
@@ -226,29 +225,6 @@ xargs (char** argv) {
     pmfree(buf);
     return (-1);
 }
-
-/*
-================================================================================
-*/
-
-int
-do_at (char** argv) {
-    delay(atoi(argv[1]) * 30);
-    execv(argv[2], &(argv[2]));
-    unknown(argv, argv[2]);
-    return (-1);
-}
-
-int
-at (char** argv) {
-    if (argc(argv) < 3) {
-        noargs(argv);
-        return (-1);
-    }
-    spawntask(do_at, DEFAULT_STACK_SIZE, argv);
-    return (0);
-}
-
 
 /*
 ================================================================================

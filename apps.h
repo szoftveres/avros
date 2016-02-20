@@ -18,8 +18,6 @@ int sleep (char** argv);
 
 int xargs (char** argv);
 
-int at (char** argv);
-
 int pr_uptime (char** argv);
 
 int f_stat (char** argv);

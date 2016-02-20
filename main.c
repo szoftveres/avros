@@ -2,7 +2,6 @@
 
 #include "vfs.h"
 #include "drv.h"
-#include "sema.h"
 #include "ts.h"
 #include "pm.h"
 #include "es.h"
@@ -56,7 +55,6 @@ startup (void* args UNUSED) {
     es_regprg("cap",        cap,            DEFAULT_STACK_SIZE);
     es_regprg("sleep",      sleep,          DEFAULT_STACK_SIZE);
     es_regprg("xargs",      xargs,          DEFAULT_STACK_SIZE);
-    es_regprg("at",         at,             DEFAULT_STACK_SIZE);
     es_regprg("repeat",     repeat,         DEFAULT_STACK_SIZE);
     es_regprg("uptime",     pr_uptime,      DEFAULT_STACK_SIZE);
     es_regprg("stat",       f_stat,         DEFAULT_STACK_SIZE);

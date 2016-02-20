@@ -37,7 +37,7 @@ HEX_EEPROM_FLAGS += --change-section-lma .eeprom=0 --no-change-warnings
 
 
 ## Objects that must be built in order to link
-OBJECTS = apps.o kernel.o main.o misc.o sh.o sys.o drv.o sema.o pm.o es.o init.o queue.o vfs.o ts.o 
+OBJECTS = apps.o kernel.o main.o misc.o sh.o sys.o drv.o pm.o es.o init.o queue.o vfs.o ts.o 
 
 ## Objects explicitly added by the user
 LINKONLYOBJECTS = 
@@ -65,9 +65,6 @@ sys.o: ../sys.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 drv.o: ../drv.c
-	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
-
-sema.o: ../sema.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 pm.o: ../pm.c

@@ -23,7 +23,8 @@ void usart0_event (void* args UNUSED) {
     while(!(UCSR0A & (1<<UDRE0))) yield();
     if (!(UCSR0A & (1<<TXC0))) {
         /* Generate the first TXC interrupt */
-        UCSR0A |= (1<<TXC0);
+        //UCSR0A |= (1<<TXC0);
+        UDR0 = (unsigned char) '\n';
     }
 
     while (1) {
