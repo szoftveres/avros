@@ -14,7 +14,8 @@ enum {
     VFS_FINAL,
 
     /* Query types */
-    VFS_INTERRUPT,
+    VFS_RX_INTERRUPT,
+    VFS_TX_INTERRUPT,
 
     VFS_IGET,
     VFS_IPUT,
@@ -127,7 +128,6 @@ typedef union mkdev_u {
  */
 
 typedef struct interrupt_s {
-    int             cmd;
     int             data;
 } interrupt_t;
 

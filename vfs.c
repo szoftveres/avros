@@ -511,7 +511,8 @@ vfs (void* args UNUSED) {
             do_close(vfs_client, &msg);
             break;
 
-          case VFS_INTERRUPT:
+          case VFS_RX_INTERRUPT:
+          case VFS_TX_INTERRUPT:
             sendrec(msg.client, &msg, sizeof(msg));
             client = msg.client;
             break;
@@ -522,7 +523,7 @@ vfs (void* args UNUSED) {
             do_rw(vfs_client, &msg);
             break;
         }
-        if (msg.cmd != VFS_HOLD) {
+        if ((msg.cmd != VFS_HOLD) && client) {
             msg.cmd = VFS_FINAL;
             send(client, &msg);
         }

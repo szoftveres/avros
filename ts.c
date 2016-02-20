@@ -6,7 +6,6 @@
 /*
  *
  */
-
 typedef struct tswait_s {
     QUEUE_HEADER
     pid_t           client;
@@ -16,7 +15,6 @@ typedef struct tswait_s {
 /*
  * TIMER COMMANDS
  */
-
 enum {
     TS_NONE,
     TS_DELAY,
@@ -30,7 +28,6 @@ enum {
 /*
  * DELAY
  */
-
 typedef struct delay_s {
     int             ticks;          /* ticks */
 } delay_t;
@@ -38,7 +35,6 @@ typedef struct delay_s {
 /*
  *
  */
-
 typedef struct tsmsg_s {
     int             cmd;
     union {
@@ -52,7 +48,6 @@ typedef struct tsmsg_s {
 /*
  * Returns the created timer, or NULL on error
  */
-
 static tswait_t*
 addtswait (pid_t client, int delay, q_head_t* que) {
     tswait_t *t;
@@ -69,7 +64,6 @@ addtswait (pid_t client, int delay, q_head_t* que) {
 /*
  *
  */
-
 static q_item_t*
 ts_managedelay (q_head_t* que, q_item_t* w) {
     tsmsg_t        msg;
@@ -84,7 +78,6 @@ ts_managedelay (q_head_t* que, q_item_t* w) {
 /*
  *
  */
-
 static void
 tickd (void* args UNUSED) {
     tsmsg_t msg;
@@ -106,7 +99,6 @@ tickd (void* args UNUSED) {
 /*
  *
  */
-
 static void
 step_timer (time_t* time) {
     if (++time->sec != 60) {return;}
@@ -121,7 +113,6 @@ step_timer (time_t* time) {
 /*
  *
  */
-
 void
 ts (void* args UNUSED) {
     pid_t           client;
@@ -131,12 +122,10 @@ ts (void* args UNUSED) {
     time_t          globtime;
     char            ticks;
 
-        
     memset (&uptime, 0, sizeof(time_t));
     memset (&globtime, 0, sizeof(time_t));
     ticks = 0;
     q_init(&ts_wait_q);
-
 
     client = cratetask(TASK_PRIO_RT, PAGE_INVALID);
     allocatestack(client, DEFAULT_STACK_SIZE);
@@ -187,13 +176,11 @@ ts (void* args UNUSED) {
 /*
  *
  */
-
 static pid_t            tstask;
 
 /*
  *
  */
-
 pid_t
 settspid (pid_t pid) {
     tstask = pid;
@@ -203,7 +190,6 @@ settspid (pid_t pid) {
 /*
  * 
  */
-
 void
 delay (int ticks) {
     tsmsg_t msg;
@@ -216,7 +202,6 @@ delay (int ticks) {
 /*
  * 
  */
-
 void
 getuptime (time_t* time) {
     tsmsg_t msg;
@@ -229,7 +214,6 @@ getuptime (time_t* time) {
 /*
  * 
  */
-
 void
 gettime (time_t* time) {
     tsmsg_t msg;
@@ -242,7 +226,6 @@ gettime (time_t* time) {
 /*
  * 
  */
-
 void
 settime (time_t* time) {
     tsmsg_t msg;

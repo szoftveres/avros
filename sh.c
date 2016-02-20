@@ -125,21 +125,6 @@ exec_job (char** argv) {
 
 
 /**
-  This task will launch the exec process and exits immediately
-  thus the shell won't have any zombies
-*/
-
-static int
-launch_job (char** argv) {
-	char *cmd = (char*) pmmalloc(MAX_JOBLEN);
-    ASSERT(cmd);
-    receive(TASK_ANY, cmd, MAX_JOBLEN);
-    send(spawntask(exec_job, DEFAULT_STACK_SIZE + 64, argv), cmd);
-	pmfree(cmd);
-	return (0);
-}
-
-/**
 */
 
 static int
@@ -175,6 +160,43 @@ builtin (char* cmd) {
 
 
 /**
+  This task will launch the exec process and exits immediately
+  thus the shell won't have any zombies
+*/
+
+static int
+launch_job (char** argv) {
+	char *cmd = (char*) pmmalloc(MAX_JOBLEN);
+    ASSERT(cmd);
+    receive(TASK_ANY, cmd, MAX_JOBLEN);
+    send(spawntask(exec_job, DEFAULT_STACK_SIZE + 64, argv), cmd);
+	pmfree(cmd);
+	return (0);
+}
+
+
+static int
+execute (char interactive, char direct, char* line, char** argv) {
+    char* job;
+    int code;
+    if (direct) {
+        if (builtin(line)) {
+            return 0;
+        }
+    }
+    job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
+    ASSERT(job);
+    strcpy(job, line);					/* filling with one section */
+    send(spawntask(direct ? exec_job: launch_job, DEFAULT_STACK_SIZE+64, argv), job);
+    pmfree(job);							/* deleting buffer */
+    wait(&code);
+    if (direct && interactive) {
+        mfprintf(STDERR, " (%d)\n", code);
+    }
+    return (code);
+}
+
+/**
 */
 
 static int
@@ -197,29 +219,6 @@ getcmd (int fin, char* cmd, int len) {
     }
     cmd[i] = '\0';
     return 0;
-}
-
-
-
-static int
-execute (char interactive, char direct, char* line, char** argv) {
-    char* job;
-    int code;
-    if (direct) {
-        if (builtin(line)) {
-            return 0;
-        }
-    }
-    job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
-    ASSERT(job);
-    strcpy(job, line);					/* filling with one section */
-    send(spawntask(direct ? exec_job: launch_job, DEFAULT_STACK_SIZE+64, argv), job);
-    pmfree(job);							/* deleting buffer */
-    wait(&code);
-    if (direct && interactive) {
-        mfprintf(STDERR, " (%d)\n", code);
-    }
-    return (code);
 }
 
 /**

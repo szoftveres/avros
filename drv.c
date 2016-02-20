@@ -10,23 +10,30 @@
 
 
 void usart0_event (void* args UNUSED) {
-    vfsmsg_t     msg;
-    pid_t       driver;
+    vfsmsg_t    msg;
     pid_t       manager;
+    pid_t       driver;
 
     driver = receive(TASK_ANY, &msg, sizeof(msg));
     manager = msg.client;
+
+    UBRR0H = 0;    /* 9600 BAUD */
+    UBRR0L = 103;  /* 9600 BAUD */
+    UCSR0C = (1<<USBS0)|(3<<UCSZ00);
+    UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+
     send(driver, &msg);
 
     kirqdis();
 
     while(!(UCSR0A & (1<<UDRE0))) yield();
-    if (!(UCSR0A & (1<<TXC0))) {
+//    if (!(UCSR0A & (1<<TXC0))) {
         /* Generate the first TXC interrupt */
         //UCSR0A |= (1<<TXC0);
         UDR0 = (unsigned char) '\n';
-    }
+//    }
 
+    msg.client = driver;
     while (1) {
         UCSR0B |= (1<<RXCIE0); /* Re-Enable RXC interrupt */
         UCSR0B |= (1<<TXCIE0); /* Re-Enable TXC interrupt */
@@ -34,16 +41,14 @@ void usart0_event (void* args UNUSED) {
           case EVENT_USART0RX:
             UCSR0B &= ~(1<<RXCIE0); /* Disable RXC interrupt */
             msg.interrupt.data = UDR0; /* this will clear RXC flag */
-            msg.interrupt.cmd = VFS_READC;
+            msg.cmd = VFS_RX_INTERRUPT;
             break;
           case EVENT_USART0TX:
             UCSR0B &= ~(1<<TXCIE0); /* Disable TXC interrupt */
             /* Executing the interrupt handler clears TXC flag automatically */
-            msg.interrupt.cmd = VFS_WRITEC;
+            msg.cmd = VFS_TX_INTERRUPT;
             break;
         }
-        msg.cmd = VFS_INTERRUPT;
-        msg.client = driver;
         send(manager, &msg);
     }
 }
@@ -61,11 +66,6 @@ void usart0 (void* args UNUSED) {
 
     q_init(&rd_q);
     q_init(&wr_q);
-
-    UBRR0H = 0;    /* 9600 BAUD */
-    UBRR0L = 103;  /* 9600 BAUD */
-    UCSR0C = (1<<USBS0)|(3<<UCSZ00);
-    UCSR0B = (1<<RXEN0)|(1<<TXEN0);
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -92,7 +92,7 @@ void usart0 (void* args UNUSED) {
             break;
           case VFS_READC:
             elem = (vfsmsg_t*)(Q_FIRST(rd_q));
-            if (elem && elem->cmd == VFS_INTERRUPT) {
+            if (elem && elem->cmd == VFS_RX_INTERRUPT) {
                 msg.rw.data = elem->interrupt.data;
                 kfree(Q_REMV(&rd_q, elem));
             } else {
@@ -105,7 +105,7 @@ void usart0 (void* args UNUSED) {
             break;
           case VFS_WRITEC:
             elem = (vfsmsg_t*)(Q_FIRST(wr_q));
-            if (elem && elem->cmd == VFS_INTERRUPT) {
+            if (elem && elem->cmd == VFS_TX_INTERRUPT) {
                 UDR0 = (unsigned char) msg.rw.data;
                 kfree(Q_REMV(&wr_q, elem));
             } else {
@@ -116,40 +116,139 @@ void usart0 (void* args UNUSED) {
             }
             msg.rw.bnum = 0;
             break; 
-          case VFS_INTERRUPT:
-            switch (msg.interrupt.cmd) {
-              case VFS_READC:
-                if (msg.interrupt.data == 0x04) { /* Ctrl + D */
-                    msg.interrupt.data = EOF;
-                //} else { 
-                //    ; /* ECHO */
-                }
-                elem = (vfsmsg_t*)(Q_FIRST(rd_q));
-                if (elem && elem->cmd == msg.interrupt.cmd) {
-                    msg.client = elem->client;
-                    msg.rw.data = msg.interrupt.data;
-                    kfree(Q_REMV(&rd_q, elem));
-                } else {
-                    elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-                    memcpy(elem, &msg, sizeof(msg));
-                    Q_END(&rd_q, elem);
-                    msg.cmd = VFS_HOLD;
-                }
-                break;
-              case VFS_WRITEC:
-                elem = (vfsmsg_t*)(Q_FIRST(wr_q));
-                if (elem && elem->cmd == msg.interrupt.cmd) {
-                    msg.client = elem->client;
-                    UDR0 = (unsigned char) elem->rw.data;
-                    kfree(Q_REMV(&wr_q, elem));
-                } else {
-                    elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-                    memcpy(elem, &msg, sizeof(msg));
-                    Q_END(&wr_q, elem);
-                    msg.cmd = VFS_HOLD;
-                }
-                break;
+          case VFS_RX_INTERRUPT:
+            if (msg.interrupt.data == 0x04) { /* Ctrl + D */
+                msg.interrupt.data = EOF;
+            //} else { 
+            //    ; /* ECHO */
             }
+            elem = (vfsmsg_t*)(Q_FIRST(rd_q));
+            if (elem && elem->cmd == VFS_READC) {
+                msg.client = elem->client;
+                msg.rw.data = msg.interrupt.data;
+                kfree(Q_REMV(&rd_q, elem));
+            } else {
+                elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+                memcpy(elem, &msg, sizeof(msg));
+                Q_END(&rd_q, elem);
+                msg.cmd = VFS_HOLD;
+            }
+            break;
+          case VFS_TX_INTERRUPT:
+            elem = (vfsmsg_t*)(Q_FIRST(wr_q));
+            if (elem && elem->cmd == VFS_WRITEC) {
+                msg.client = elem->client;
+                UDR0 = (unsigned char) elem->rw.data;
+                kfree(Q_REMV(&wr_q, elem));
+            } else {
+                elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+                memcpy(elem, &msg, sizeof(msg));
+                Q_END(&wr_q, elem);
+                msg.cmd = VFS_HOLD;
+            }
+            break;
+        }
+        send(client, &msg);
+    }
+}
+
+
+/*
+ *
+ */
+
+void
+usart0_try_write_serve(q_head_t* wr_q, vfsmsg_t *msg, int cmd) {
+    vfsmsg_t*   elem;
+
+    elem = (vfsmsg_t*)(Q_FIRST(*wr_q));
+    if (elem && elem->cmd == cmd) {
+        char i = (msg->client == getpid());
+        UDR0 = (unsigned char) (i ? elem : msg)->rw.data;
+        msg->client = (i ? elem : msg)->client;
+        kfree(Q_REMV(wr_q, elem));
+        msg->rw.bnum = 0;
+    } else {
+        elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+        memcpy(elem, msg, sizeof(vfsmsg_t));
+        Q_END(wr_q, elem);
+        msg->cmd = VFS_HOLD;
+    }
+}
+
+
+void
+usart_try_read_serve(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
+    vfsmsg_t*   elem;
+
+    elem = (vfsmsg_t*)(Q_FIRST(*rd_q));
+    if (elem && elem->cmd == cmd) {
+        char i = (msg->client == getpid());
+        msg->rw.data = (i ? elem : msg)->interrupt.data;
+        msg->client = (i ? elem : msg)->client;
+        kfree(Q_REMV(rd_q, elem));
+        msg->rw.bnum = 0;
+    } else {
+        elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
+        memcpy(elem, &msg, sizeof(vfsmsg_t));
+        Q_END(rd_q, elem);
+        msg->cmd = VFS_HOLD;
+    }
+}
+
+
+void term_usart0 (void* args UNUSED) {
+    pid_t client;
+    vfsmsg_t msg;  
+    q_head_t rd_q;
+    q_head_t wr_q;
+
+    q_init(&rd_q);
+    q_init(&wr_q);
+
+    while (1) {
+        client = receive(TASK_ANY, &msg, sizeof(msg));
+        
+        switch (msg.cmd) {
+
+          case VFS_MKDEV: {
+                pid_t       task;
+                task = cratetask(TASK_PRIO_RT, PAGE_INVALID);
+                allocatestack(task, DEFAULT_STACK_SIZE-64);
+                setuptask(task, usart0_event, NULL, NULL);
+                starttask(task);
+                msg.client = client;
+                sendrec(task, &msg, sizeof(msg));
+            }
+            break;
+          case VFS_IGET:
+            break;
+          case VFS_IPUT:
+            break;
+          case VFS_LINK:
+            break;
+          case VFS_UNLINK:
+            break;
+          case VFS_READC:
+            usart_try_read_serve(&rd_q, &msg, VFS_RX_INTERRUPT);
+            break;
+          case VFS_WRITEC:
+            usart0_try_write_serve(&wr_q, &msg, VFS_TX_INTERRUPT);
+            break;
+          case VFS_RX_INTERRUPT:
+            if (msg.interrupt.data == 0x04) { /* Ctrl + D */
+                msg.interrupt.data = EOF;
+            } else {
+                /* Echo */
+                vfsmsg_t echomsg;
+                echomsg.cmd = VFS_WRITEC;
+                echomsg.client = NULL;
+                usart0_try_write_serve(&wr_q, &echomsg, VFS_TX_INTERRUPT);
+            }
+            usart_try_read_serve(&rd_q, &msg, VFS_READC);
+            break;
+          case VFS_TX_INTERRUPT:
+            usart0_try_write_serve(&wr_q, &msg, VFS_WRITEC);
             break;
         }
         send(client, &msg);
