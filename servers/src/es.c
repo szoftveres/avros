@@ -1,6 +1,6 @@
-#include "kernel.h"
-#include "queue.h"
-#include "es.h"
+#include "../../kernel/include/kernel.h"
+#include "../../lib/include/queue.h"
+#include "../include/es.h"
 
 /*
 ================================================================================

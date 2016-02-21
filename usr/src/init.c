@@ -1,8 +1,7 @@
-#include "pm.h"
-#include "es.h"
+#include "../../servers/include/pm.h"
 
-#include "apps.h"
-
+#include "../include/apps.h"
+#include "../include/init.h"
 /*
  *
  */

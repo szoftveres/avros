@@ -1,9 +1,10 @@
-#include "kernel.h"
-#include "drv.h"
-#include "vfs.h"
 #include <avr/io.h>
-#include "queue.h"
+#include "../../kernel/include/kernel.h"
 
+#include "../../servers/include/vfs.h"
+#include "../../lib/include/queue.h"
+
+#include "../include/drv.h"
 /*
 ================================================================================
  */

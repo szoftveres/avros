@@ -1,11 +1,12 @@
+#include "../../kernel/include/kernel.h"
+#include "../../servers/include/ts.h"
+#include "../../servers/include/pm.h"
+#include "../../servers/include/vfs.h"  /* EOF */
+
+#include "../lib/include/mstdlib.h"
 #include <string.h>
-#include "kernel.h"
-#include "apps.h"
-#include "misc.h"
-#include "ts.h"
-#include "pm.h"
-#include "vfs.h"  /* EOF */
-#include "es.h"
+
+#include "../include/apps.h"
 
 /*
 ================================================================================

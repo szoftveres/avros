@@ -1,7 +1,7 @@
-#include "sys.h"
-#include "kernel.h"
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "../../kernel/include/kernel.h"
+#include "../include/sys.h"
 
 #if 0
 

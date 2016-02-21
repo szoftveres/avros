@@ -1,5 +1,5 @@
-#include "queue.h"
 #include <stddef.h>
+#include "../include/queue.h"
 
 /*    
  *    QUEUE - General purpose queue (doubly liked list) implementation

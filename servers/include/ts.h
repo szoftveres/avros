@@ -1,7 +1,7 @@
 #ifndef _TIMER_H_
 #define _TIMER_H_
 
-#include "kernel.h"
+#include "../../kernel/include/kernel.h"
 
 typedef struct time_s {
     char        sec;

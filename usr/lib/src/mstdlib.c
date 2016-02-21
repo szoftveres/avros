@@ -1,11 +1,10 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
-#include "kernel.h"
-#include "misc.h"
-#include "vfs.h"
-#include "pm.h"
-
+#include "../../../kernel/include/kernel.h"
+#include "../../../servers/include/vfs.h"
+#include "../../../servers/include/pm.h"
+#include "../include/mstdlib.h"
 
 int
 mgetc (void) {

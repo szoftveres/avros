@@ -1,7 +1,7 @@
-#include "ts.h"
-#include "kernel.h"
-#include "queue.h"
 #include <avr/io.h> /* timer */
+#include "../../kernel/include/kernel.h"
+#include "../../lib/include/queue.h"
+#include "../include/ts.h"
 
 /*
  *

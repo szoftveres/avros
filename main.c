@@ -1,14 +1,15 @@
-#include "kernel.h"
+#include "kernel/include/kernel.h"
 
-#include "vfs.h"
-#include "drv.h"
-#include "ts.h"
-#include "pm.h"
-#include "es.h"
-#include "init.h"
+#include "servers/include/vfs.h"
+#include "servers/include/ts.h"
+#include "servers/include/pm.h"
+#include "servers/include/es.h"
 
-#include "apps.h"
-#include "sh.h"
+#include "drivers/include/drv.h"
+
+#include "usr/include/init.h"
+#include "usr/include/apps.h"
+#include "usr/include/sh.h"
 
 /*
  * The main purpose of this task is to start all the servers and set

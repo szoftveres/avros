@@ -1,6 +1,6 @@
-#include "kernel.h"
-#include "vfs.h"
-#include "queue.h"
+#include "../../kernel/include/kernel.h"
+#include "../../lib/include/queue.h"
+#include "../include/vfs.h"
 
 /*
  * DEVTAB

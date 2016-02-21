@@ -37,7 +37,7 @@ HEX_EEPROM_FLAGS += --change-section-lma .eeprom=0 --no-change-warnings
 
 
 ## Objects that must be built in order to link
-OBJECTS = apps.o kernel.o main.o misc.o sh.o sys.o drv.o pm.o es.o init.o queue.o vfs.o ts.o 
+OBJECTS = main.o kernel.o sys.o drv.o queue.o es.o pm.o ts.o vfs.o mstdlib.o apps.o init.o sh.o 
 
 ## Objects explicitly added by the user
 LINKONLYOBJECTS = 
@@ -46,43 +46,43 @@ LINKONLYOBJECTS =
 all: $(TARGET) os.hex os.eep os.lss size
 
 ## Compile
-apps.o: ../apps.c
-	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
-
-kernel.o: ../kernel.c
-	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
-
 main.o: ../main.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-misc.o: ../misc.c
+kernel.o: ../kernel/src/kernel.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-sh.o: ../sh.c
+sys.o: ../kernel/src/sys.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-sys.o: ../sys.c
+drv.o: ../drivers/src/drv.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-drv.o: ../drv.c
+queue.o: ../lib/src/queue.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-pm.o: ../pm.c
+es.o: ../servers/src/es.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-es.o: ../es.c
+pm.o: ../servers/src/pm.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-init.o: ../init.c
+ts.o: ../servers/src/ts.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-queue.o: ../queue.c
+vfs.o: ../servers/src/vfs.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-vfs.o: ../vfs.c
+mstdlib.o: ../usr/lib/src/mstdlib.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-ts.o: ../ts.c
+apps.o: ../usr/src/apps.c
+	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
+
+init.o: ../usr/src/init.c
+	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
+
+sh.o: ../usr/src/sh.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 ##Link

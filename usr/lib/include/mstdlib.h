@@ -1,5 +1,5 @@
-#ifndef _MISC_H_
-#define _MISC_H_
+#ifndef _MSTDLIB_H_
+#define _MSTDLIB_H_
 
 enum {
     STDIN = 0,

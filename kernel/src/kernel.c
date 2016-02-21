@@ -1,9 +1,8 @@
 #include <avr/interrupt.h>
 #include <string.h>
-#include "kernel.h"
-#include "sys.h"
-#include "queue.h"
-
+#include "../../lib/include/queue.h"
+#include "../include/sys.h"
+#include "../include/kernel.h"
 /*
  * ADD TASK
  */

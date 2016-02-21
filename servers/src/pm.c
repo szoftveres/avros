@@ -1,9 +1,8 @@
-#include "pm.h"
-#include "es.h"
-#include "vfs.h"
-#include "kernel.h"
-#include "queue.h"
-
+#include "../../kernel/include/kernel.h"
+#include "../../lib/include/queue.h"
+#include "../include/es.h"
+#include "../include/vfs.h"
+#include "../include/pm.h"
 
 typedef struct pm_task_s {
     QUEUE_HEADER
