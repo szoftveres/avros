@@ -523,6 +523,7 @@ vfs (void* args UNUSED) {
             do_rw(vfs_client, &msg);
             break;
         }
+        
         if ((msg.cmd != VFS_HOLD) && client) {
             msg.cmd = VFS_FINAL;
             send(client, &msg);

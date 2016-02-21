@@ -37,7 +37,7 @@ startup (void* args UNUSED) {
 
     /* setting up devices and special files */
     mkdev(pipedev, NULL);
-    mknod(mkdev(usart0, NULL), "ty0");
+    mknod(mkdev(term_usart0, NULL), "ty0");
     mkdev(memfile, NULL);
 
     /* starting executable store server */
