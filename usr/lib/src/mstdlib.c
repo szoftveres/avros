@@ -4,6 +4,7 @@
 #include "../../../kernel/include/kernel.h"
 #include "../../../servers/include/vfs.h"
 #include "../../../servers/include/pm.h"
+#include "../../../lib/include/mstddef.h"
 #include "../include/mstdlib.h"
 
 int

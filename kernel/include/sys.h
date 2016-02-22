@@ -163,6 +163,6 @@ typedef struct cpu_context_s {
  *
  */
 
-void cpu_sleep(void);
+void cpu_sleep (void);
 
 #endif

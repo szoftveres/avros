@@ -2,10 +2,7 @@
 #define _VFS_H_
 
 #include "../../lib/include/queue.h"
-
-
-
-#define MAX_FD          (8)
+#include "../../lib/include/mstddef.h"
 
 enum {   
     /* Answer types */
@@ -46,9 +43,6 @@ struct stat {
     int     ino;
     int     size;
 };
-
-
-#define EOF	(-1)
 
 /*
  * ADD/DEL CLIENT
@@ -200,18 +194,9 @@ typedef struct vfsmsg_s {
  *
  */
 
-
 void vfs (void* args);
 
 pid_t setvfspid (pid_t pid);
-
-
-
-
-
-
-
-
 
 pid_t vfs_cratetask (pid_t pid, pid_t parent);
 void vfs_deletetask (pid_t pid);
@@ -225,17 +210,5 @@ int fstat (char *name, struct stat *st_stat);
 void close (int fd);
 int readc (int fd);
 int writec (int fd, int c);
-
-
-
-void
-dputc (int data);
-void
-dputs (const char* str);
-void
-dputu (unsigned int num);
-
-
-
 
 #endif

@@ -2,8 +2,6 @@
 #define _SH_H_
 
 
-int sh(char** argv);
-
-
+int sh (char** argv);
 
 #endif

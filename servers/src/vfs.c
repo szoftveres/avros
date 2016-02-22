@@ -1,5 +1,6 @@
 #include "../../kernel/include/kernel.h"
 #include "../../lib/include/queue.h"
+#include "../../lib/include/mstddef.h"
 #include "../include/vfs.h"
 
 /*

@@ -3,6 +3,7 @@
 
 #include "../../servers/include/vfs.h"
 #include "../../lib/include/queue.h"
+#include "../../lib/include/mstddef.h"
 
 #include "../include/drv.h"
 /*

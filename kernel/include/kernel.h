@@ -45,7 +45,10 @@ typedef struct task_s* pid_t;
  *
  */
 
-void kernel(void(*ptp)(void* args), void* args, size_t stack, unsigned char prio);
+void kernel (void(*ptp)(void* args),
+             void* args,
+             size_t stack,
+             unsigned char prio);
 
 /*
  *

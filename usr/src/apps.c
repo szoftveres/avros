@@ -1,7 +1,8 @@
 #include "../../kernel/include/kernel.h"
 #include "../../servers/include/ts.h"
 #include "../../servers/include/pm.h"
-#include "../../servers/include/vfs.h"  /* EOF */
+#include "../../servers/include/vfs.h"
+#include "../../lib/include/mstddef.h"  /* EOF */
 
 #include "../lib/include/mstdlib.h"
 #include <string.h>
