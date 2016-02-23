@@ -374,8 +374,10 @@ do_rw (vfs_task_t *client, vfsmsg_t *msg) {
 
     while (msg->cmd == VFS_REPEAT) {
         msg->cmd = VFS_FINAL;
-        /* Unblocking waiting tasks(s) */
-        send(msg->client, msg);
+        if (msg->client) { /* XXX This should not happen, ASSERT */
+            /* Unblocking waiting tasks(s) */
+            send(msg->client, msg);
+        }
         sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
     }
     filp[fp].pos += msg->rw.bnum;

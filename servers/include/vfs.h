@@ -172,7 +172,6 @@ typedef struct link_s {
  */
 
 typedef struct vfsmsg_s {
-    QUEUE_HEADER;
     int             cmd;        /* command */
     pid_t           client;     /* client (client who requests IO) */
     union {
@@ -189,6 +188,12 @@ typedef struct vfsmsg_s {
         link_t          link;
     };
 } vfsmsg_t;
+
+typedef struct vfsmsg_container_s {
+    QUEUE_HEADER;
+    vfsmsg_t        msg;
+} vfsmsg_container_t;
+
 
 /*
  *

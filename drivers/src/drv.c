@@ -56,59 +56,24 @@ void usart0_event (void* args UNUSED) {
     }
 }
 
-/*
- *
- */
-
 void
 usart0_serve_write(q_head_t* wr_q, vfsmsg_t *msg, int cmd) {
-    vfsmsg_t*   elem;
+    vfsmsg_container_t*   container;
 
-    elem = (vfsmsg_t*)(Q_FIRST(*wr_q));
-    if (elem && elem->cmd == cmd) {
+    container = (vfsmsg_container_t*)(Q_FIRST(*wr_q));
+    if (container && container->msg.cmd == cmd) {
         char i = (msg->cmd == VFS_TX_INTERRUPT);
-        UDR0 = (unsigned char) (i ? elem : msg)->rw.data;
-        msg->client = (i ? elem : msg)->client;
-        kfree(Q_REMV(wr_q, elem));
+        UDR0 = (unsigned char) (i ? container->msg : *msg).rw.data;
+        msg->client = (i ? container->msg : *msg).client;
+        kfree(Q_REMV(wr_q, container));
         msg->rw.bnum = 0;
         msg->cmd = VFS_FINAL;
     } else {
-        elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-        memcpy(elem, msg, sizeof(vfsmsg_t));
-        Q_END(wr_q, elem);
+        container = (vfsmsg_container_t*) kmalloc(sizeof(vfsmsg_container_t));
+        memcpy(&(container->msg), msg, sizeof(vfsmsg_t));
+        Q_END(wr_q, container);
         msg->cmd = VFS_HOLD;
     }
-}
-
-
-void
-usart_serve_read(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
-    vfsmsg_t*   elem;
-
-    elem = (vfsmsg_t*)(Q_FIRST(*rd_q));
-    if (elem && elem->cmd == cmd) {
-        char i = (msg->cmd == VFS_RX_INTERRUPT);
-        msg->client = (i ? elem : msg)->client;
-        msg->rw.data = (i ? msg : elem)->interrupt.data;
-        kfree(Q_REMV(rd_q, elem));
-        msg->rw.bnum = 0;
-        msg->cmd = VFS_FINAL;
-    } else {
-        elem = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-        memcpy(elem, msg, sizeof(vfsmsg_t));
-        Q_END(rd_q, elem);
-        msg->cmd = VFS_HOLD;
-    }
-}
-
-
-void
-usart_reply_char (q_head_t* rd_q, int c) {
-    vfsmsg_t msg;
-    msg.cmd = VFS_RX_INTERRUPT;
-    msg.client = NULL;
-    msg.rw.data = c;
-    usart_serve_read(rd_q, &msg, VFS_READC);
 }
 
 
@@ -119,18 +84,58 @@ usart0_print_char (q_head_t* wr_q, int c) {
     msg.client = NULL;
     msg.rw.data = c;
     usart0_serve_write(wr_q, &msg, VFS_TX_INTERRUPT);
+/*
+    msg.cmd = VFS_REPEAT;
+    sendrec(client, &msg, sizeof(vfsmsg_t));
+*/
+}
+
+/*
+ * **************************
+ */
+
+void
+usart_serve_read(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
+    vfsmsg_container_t*   container;
+
+    container = (vfsmsg_container_t*)(Q_FIRST(*rd_q));
+    if (container && container->msg.cmd == cmd) {
+        char i = (msg->cmd == VFS_RX_INTERRUPT);
+        msg->client = (i ? container->msg : *msg).client;
+        msg->rw.data = (i ? *msg : container->msg).interrupt.data;
+        kfree(Q_REMV(rd_q, container));
+        msg->rw.bnum = 0;
+        msg->cmd = VFS_FINAL;
+    } else {
+        container = (vfsmsg_container_t*) kmalloc(sizeof(vfsmsg_container_t));
+        memcpy(&(container->msg), msg, sizeof(vfsmsg_t));
+        Q_END(rd_q, container);
+        msg->cmd = VFS_HOLD;
+    }
 }
 
 
 void
-usart_flush (q_head_t* rd_q, char* buf, int* idx) {
+usart_reply_char (pid_t client, q_head_t* rd_q, int c) {
+    vfsmsg_t msg;
+    msg.cmd = VFS_RX_INTERRUPT;
+    msg.client = NULL;
+    msg.rw.data = c;
+    usart_serve_read(rd_q, &msg, VFS_READC);
+
+    msg.cmd = VFS_REPEAT;
+    sendrec(client, &msg, sizeof(vfsmsg_t));
+}
+
+
+void
+usart_flush (pid_t client, q_head_t* rd_q, char* buf, int* idx) {
     int    i;
     for (i = 0; i != *idx; i++) {
-        usart_reply_char(rd_q, (int) buf[i]);
+        usart_reply_char(client, rd_q, (int) buf[i]);
     }
     *idx = 0;
 }
-
 
 
 void tty_usart0 (void* args UNUSED) {
@@ -187,15 +192,15 @@ void tty_usart0 (void* args UNUSED) {
                 switch (msg.interrupt.data) {
                   case 0x04:        /* Ctrl + D */
                     if (!idx) {
-                        usart_reply_char(&rd_q, EOF);
+                        usart_reply_char(client, &rd_q, EOF);
                     } else {
-                        usart_flush(&rd_q, tbuf, &idx);
+                        usart_flush(client, &rd_q, tbuf, &idx);
                     }
                     break;
                   case 0x03:        /* Ctrl + C */
                     idx = 0;
                     tbuf[idx++] = '\n';
-                    usart_flush(&rd_q, tbuf, &idx);
+                    usart_flush(client, &rd_q, tbuf, &idx);
                     break;
                   case 0x08:        /* Backspace */ 
                     if (idx) {
@@ -206,7 +211,7 @@ void tty_usart0 (void* args UNUSED) {
                     break;
                   case '\n':        /* NewLine */
                     tbuf[idx++] = msg.interrupt.data;
-                    usart_flush(&rd_q, tbuf, &idx);
+                    usart_flush(client, &rd_q, tbuf, &idx);
                     break;
                   default:
                     tbuf[idx++] = msg.interrupt.data;
@@ -223,14 +228,9 @@ void tty_usart0 (void* args UNUSED) {
     }
 }
 
-
-
-
-
 /*
 ================================================================================
  */
-
 
 #define MF_MAX_NODES 8
 
@@ -364,9 +364,9 @@ pd_find_empty_node (pdnode_t** list) {
 }
 
 void pipedev (void* args UNUSED) {
-    pid_t client;
-    vfsmsg_t msg;
-    vfsmsg_t* msg_p; /* Temporary pointer */
+    pid_t               client;
+    vfsmsg_t            msg;
+    vfsmsg_container_t* container; /* Temporary pointer */
 
     pdnode_t** nodes = (pdnode_t**)kmalloc(sizeof(pdnode_t*) * PD_MAX_NODES);
     memset(nodes, 0, (sizeof(pdnode_t*) * PD_MAX_NODES));
@@ -425,12 +425,12 @@ void pipedev (void* args UNUSED) {
              */
             if (nodes[msg.iget.ino]->refcnt == 1) {
                 while (!Q_EMPTY(nodes[msg.iget.ino]->msgs)) {
-                    msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.iget.ino]->msgs);
-                    msg_p->rw.data = EOF;
-                    msg_p->rw.bnum = 0;
-                    msg_p->cmd = VFS_REPEAT;
-                    sendrec(client, msg_p, sizeof(vfsmsg_t));
-                    kfree(Q_REMV(&(nodes[msg.iget.ino]->msgs), msg_p));
+                    container = (vfsmsg_container_t*) Q_FIRST(nodes[msg.iget.ino]->msgs);
+                    container->msg.rw.data = EOF;
+                    container->msg.rw.bnum = 0;
+                    container->msg.cmd = VFS_REPEAT;
+                    sendrec(client, &(container->msg), sizeof(vfsmsg_t));
+                    kfree(Q_REMV(&(nodes[msg.iget.ino]->msgs), container));
                 }
                 break;
             }
@@ -457,33 +457,33 @@ void pipedev (void* args UNUSED) {
                     msg.rw.data = EOF;
                 } else {
                     /* FIFO empty, save request */
-                    msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-                    memcpy(msg_p, &msg, sizeof(vfsmsg_t));
-                    Q_END(&(nodes[msg.rw.ino]->msgs), msg_p);
+                    container = (vfsmsg_container_t*) kmalloc(sizeof(vfsmsg_container_t));
+                    memcpy(&(container->msg), &msg, sizeof(vfsmsg_t));
+                    Q_END(&(nodes[msg.rw.ino]->msgs), container);
                     msg.cmd = VFS_HOLD;
                 }
             } else {        /* Read or Write requests in the pipe */
-                msg_p = (vfsmsg_t*) Q_FIRST(nodes[msg.rw.ino]->msgs);
-                if (msg_p->cmd == msg.cmd) {
+                container = (vfsmsg_container_t*) Q_FIRST(nodes[msg.rw.ino]->msgs);
+                if (container->msg.cmd == msg.cmd) {
                     /* Same request type, save it */
-                    msg_p = (vfsmsg_t*) kmalloc(sizeof(vfsmsg_t));
-                    memcpy(msg_p, &msg, sizeof(vfsmsg_t));
-                    Q_END(&(nodes[msg.rw.ino]->msgs), msg_p);
+                    container = (vfsmsg_container_t*) kmalloc(sizeof(vfsmsg_container_t));
+                    memcpy(&(container->msg), &msg, sizeof(vfsmsg_t));
+                    Q_END(&(nodes[msg.rw.ino]->msgs), container);
                     msg.cmd = VFS_HOLD;
                 } else {
-                    switch (msg_p->cmd) {
+                    switch (container->msg.cmd) {
                       case VFS_READC:
-                        msg_p->rw.data = msg.rw.data;
+                        container->msg.rw.data = msg.rw.data;
                       break;
                       case VFS_WRITEC:
-                        msg.rw.data = msg_p->rw.data;
+                        msg.rw.data = container->msg.rw.data;
                       break;
                     }
                     /* release waiting task */
-                    msg_p->cmd = VFS_REPEAT;
-                    msg_p->rw.bnum = 0;
-                    sendrec(client, msg_p, sizeof(vfsmsg_t));
-                    kfree(Q_REMV(&(nodes[msg.rw.ino]->msgs), msg_p));
+                    container->msg.cmd = VFS_REPEAT;
+                    container->msg.rw.bnum = 0;
+                    sendrec(client, &(container->msg), sizeof(vfsmsg_t));
+                    kfree(Q_REMV(&(nodes[msg.rw.ino]->msgs), container));
                 }
             }
             msg.rw.bnum = 0;
