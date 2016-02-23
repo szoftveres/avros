@@ -140,7 +140,7 @@ void tty_usart0 (void* args UNUSED) {
     q_head_t    wr_q;
     char        *tbuf;
     int         idx;
-    char        ttymode = 0;
+    char        ttymode = 1;
 
     q_init(&rd_q);
     q_init(&wr_q);
@@ -192,15 +192,17 @@ void tty_usart0 (void* args UNUSED) {
                         usart_flush(&rd_q, tbuf, &idx);
                     }
                     break;
-                  case 0x05:        /* Ctrl + C */
+                  case 0x03:        /* Ctrl + C */
                     idx = 0;
                     tbuf[idx++] = '\n';
                     usart_flush(&rd_q, tbuf, &idx);
                     break;
-                  case 0x06:        /* Backspace */ 
+                  case 0x08:        /* Backspace */ 
                     if (idx) {
                         idx--;
                     }
+                    break;
+                  case '\r':        /* NewLine */
                     break;
                   case '\n':        /* NewLine */
                     tbuf[idx++] = msg.interrupt.data;
@@ -210,6 +212,7 @@ void tty_usart0 (void* args UNUSED) {
                     tbuf[idx++] = msg.interrupt.data;
                     break;                    
                 }
+                msg.cmd = VFS_HOLD;
             }
             break;
           case VFS_TX_INTERRUPT:
