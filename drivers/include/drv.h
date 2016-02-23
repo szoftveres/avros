@@ -2,7 +2,7 @@
 #define _DRV_H_
 
 
-void term_usart0 (void* args);
+void tty_usart0 (void* args);
 void memfile (void* args);
 void pipedev (void* args);
 
