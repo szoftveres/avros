@@ -122,9 +122,10 @@ usart_reply_char (pid_t client, q_head_t* rd_q, int c) {
     msg.client = NULL;
     msg.rw.data = c;
     usart_serve_read(rd_q, &msg, VFS_READC);
-
-    msg.cmd = VFS_REPEAT;
-    sendrec(client, &msg, sizeof(vfsmsg_t));
+    if (msg.cmd != VFS_HOLD) {
+        msg.cmd = VFS_REPEAT;
+        sendrec(client, &msg, sizeof(vfsmsg_t));
+    }
 }
 
 
