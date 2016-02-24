@@ -384,6 +384,22 @@ do_rw (vfs_task_t *client, vfsmsg_t *msg) {
 
     return;
 }
+
+
+static void
+do_int (vfsmsg_t *msg) {
+    pid_t client = msg->client;
+    sendrec(client, msg, sizeof(vfsmsg_t));
+    while (msg->cmd == VFS_REPEAT) {
+        msg->cmd = VFS_FINAL;
+        if (msg->client) {
+            /* Unblocking waiting tasks(s) */
+            send(msg->client, msg);
+        }
+        sendrec(client, msg, sizeof(vfsmsg_t));
+    }
+    return;
+}
 /*
  * =============
  */
@@ -516,7 +532,7 @@ vfs (void* args UNUSED) {
 
           case VFS_RX_INTERRUPT:
           case VFS_TX_INTERRUPT:
-            sendrec(msg.client, &msg, sizeof(msg));
+            do_int(&msg);
             client = msg.client;
             break;
 

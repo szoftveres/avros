@@ -120,7 +120,7 @@ usart_reply_char (pid_t client, q_head_t* rd_q, int c) {
     vfsmsg_t msg;
     msg.cmd = VFS_RX_INTERRUPT;
     msg.client = NULL;
-    msg.rw.data = c;
+    msg.interrupt.data = c;
     usart_serve_read(rd_q, &msg, VFS_READC);
     if (msg.cmd != VFS_HOLD) {
         msg.cmd = VFS_REPEAT;
@@ -187,9 +187,7 @@ void tty_usart0 (void* args UNUSED) {
           case VFS_RX_INTERRUPT:
             if (!ttymode) {
                 usart_serve_read(&rd_q, &msg, VFS_READC);
-            } else {
-                /* Echo */
-                usart0_print_char(&wr_q, msg.interrupt.data);
+            } else {                
                 switch (msg.interrupt.data) {
                   case 0x04:        /* Ctrl + D */
                     if (!idx) {
@@ -206,15 +204,18 @@ void tty_usart0 (void* args UNUSED) {
                   case 0x08:        /* Backspace */ 
                     if (idx) {
                         idx--;
+                        usart0_print_char(&wr_q, msg.interrupt.data);
                     }
                     break;
                   case '\r':        /* NewLine */
                     break;
                   case '\n':        /* NewLine */
+                    usart0_print_char(&wr_q, msg.interrupt.data);
                     tbuf[idx++] = msg.interrupt.data;
                     usart_flush(client, &rd_q, tbuf, &idx);
                     break;
                   default:
+                    usart0_print_char(&wr_q, msg.interrupt.data);
                     tbuf[idx++] = msg.interrupt.data;
                     break;                    
                 }
