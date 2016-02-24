@@ -51,7 +51,6 @@ void usart0_event (void* args UNUSED) {
             msg.cmd = VFS_TX_INTERRUPT;
             break;
         }
-        msg.client = driver;
         send(manager, &msg);
     }
 }
@@ -193,13 +192,13 @@ void tty_usart0 (void* args UNUSED) {
                     if (!idx) {
                         usart_reply_char(client, &rd_q, EOF);
                     } else {
+                        usart0_print_char(&wr_q, '\n');
                         usart_flush(client, &rd_q, tbuf, &idx);
                     }
                     break;
                   case 0x03:        /* Ctrl + C */
                     idx = 0;
-                    tbuf[idx++] = '\n';
-                    usart_flush(client, &rd_q, tbuf, &idx);
+                    usart0_print_char(&wr_q, '\n');
                     break;
                   case 0x08:        /* Backspace */ 
                     if (idx) {
