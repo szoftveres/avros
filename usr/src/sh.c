@@ -333,3 +333,22 @@ sh (char** argv) {
     }
 }
 
+
+/*
+
+
+exec                builtin  [arg_list]
+                    executable  [arg_list]
+
+cmd                 exec  [ < in_fname ]  [ > out_fname ]
+                    ( cmd_grp )
+
+cmd_grp             cmd  [ |  cmd_grp ] [&]
+
+job                 cmd_grp [; [ job ] ] \n
+
+jobs                job [jobs]
+
+
+*/
+
