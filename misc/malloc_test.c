@@ -9,11 +9,11 @@ mempage_t pg;
 char mem[1024];
 
 void info(mempage_t* page) {
-    printf("Mem start:%p, Mem end:%p, brkval:%p, freelist_p:%p\n", 
+    printf("Mem start:%p, Mem end:%p, brkval:%p, freelist:%p\n", 
                 (page->heap_start - page->heap_start),
                 (page->heap_end - page->heap_start),
                 page->brkval ? (page->brkval - page->heap_start) : NULL,
-                page->freelist_p ? ((char*)page->freelist_p - page->heap_start) : NULL);
+                page->freelist ? ((char*)page->freelist - page->heap_start) : NULL);
 
 }
 
@@ -36,7 +36,7 @@ int main (int argc, char** argv) {
     pg.heap_start = &mem[0];
     pg.heap_end = &mem[1024];
     pg.brkval = NULL;
-    pg.freelist_p = NULL;
+    pg.freelist = NULL;
 
     info(&pg);
     printf("\n\n");

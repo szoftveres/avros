@@ -2,7 +2,7 @@
 #define _MALLOC_H_
 
 
-#include <stdlib.h>
+#include <stdlib.h> /* size_t definition */
 
 
 typedef struct freelist_s {
@@ -15,7 +15,7 @@ typedef struct mempage_s {
     char        *heap_start;
     char        *heap_end;
     char        *brkval;     /* init to NULL */
-    freelist_t  *freelist_p; /* init to NULL */
+    freelist_t  *freelist; /* init to NULL */
 } mempage_t;
 
 

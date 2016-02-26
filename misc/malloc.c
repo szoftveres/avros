@@ -24,7 +24,7 @@ void* do_malloc (mempage_t *page, size_t len) {
      * still fit the request -- we need it for step 2.
      *
      */
-    for (s = 0, fp1 = page->freelist_p, fp2 = NULL; fp1; fp2 = fp1, fp1 = fp1->next) {
+    for (s = 0, fp1 = page->freelist, fp2 = NULL; fp1; fp2 = fp1, fp1 = fp1->next) {
         if (fp1->size < len) {
             continue;
         }
@@ -36,7 +36,7 @@ void* do_malloc (mempage_t *page, size_t len) {
             if (fp2) {
                 fp2->next = fp1->next;
             } else {
-                page->freelist_p = fp1->next;
+                page->freelist = fp1->next;
             }
             return ((void*) (&(fp1->next)));
         } else {
@@ -64,7 +64,7 @@ void* do_malloc (mempage_t *page, size_t len) {
             if (sfp2) {
                 sfp2->next = sfp1->next;
             } else {
-                page->freelist_p = sfp1->next;
+                page->freelist = sfp1->next;
             }
             return ((void*) (&(sfp1->next)));
         }
@@ -141,11 +141,11 @@ void do_free (mempage_t* page, void *p) {
      * will be the only one on it.  If this is the last entry, we
      * can reduce page->brkval instead.
      */
-    if (!page->freelist_p) {
+    if (!page->freelist) {
         if ((char *)p + fpnew->size == page->brkval) {
             page->brkval = cpnew;
         } else {
-            page->freelist_p = fpnew;
+            page->freelist = fpnew;
         }
         return;
     }
@@ -155,7 +155,7 @@ void do_free (mempage_t* page, void *p) {
      * freelist.  Try to aggregate the chunk with adjacent chunks
      * if possible.
      */
-    for (fp1 = page->freelist_p, fp2 = NULL; fp1; fp2 = fp1, fp1 = fp1->next) {
+    for (fp1 = page->freelist, fp2 = NULL; fp1; fp2 = fp1, fp1 = fp1->next) {
         if (fp1 < fpnew) {
             continue;
         }
@@ -168,7 +168,7 @@ void do_free (mempage_t* page, void *p) {
         }
         if (!fp2) {
             /* new head of freelist */
-            page->freelist_p = fpnew;
+            page->freelist = fpnew;
             return;
         }
         break;
@@ -191,13 +191,13 @@ void do_free (mempage_t* page, void *p) {
      */
 
     /* advance to entry just before end of list */
-    for (fp1 = page->freelist_p, fp2 = NULL; fp1->next; fp2 = fp1, fp1 = fp1->next);
+    for (fp1 = page->freelist, fp2 = NULL; fp1->next; fp2 = fp1, fp1 = fp1->next);
 
     cp2 = (char *)&(fp1->next);
     if (cp2 + fp1->size == page->brkval) {
         if (fp2 == NULL) {
             /* Freelist is empty now. */
-            page->freelist_p = NULL;
+            page->freelist = NULL;
         } else {
             fp2->next = NULL;
         }

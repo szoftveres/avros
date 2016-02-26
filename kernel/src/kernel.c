@@ -99,6 +99,14 @@ typedef union allocatestack_u {
  * FREE
  */
 
+typedef struct getsetstack_s {
+    char*           ptr;            /* pointer */
+} getsetstack_t;
+
+/*
+ * FREE
+ */
+
 typedef struct kfree_s {
     void*           ptr;            /* pointer */
 } kfree_t;
@@ -124,20 +132,21 @@ typedef struct getpid_s {
  * KERNEL CALL
  */
 
-typedef struct kcall_s {
-    int              code;     /* kernel call code */
+typedef struct kcall_s {    /* 10 byte */
+    int                 code;     /* kernel call code */
     union { 
-        kmalloc_t       kmalloc;        /* malloc */
-        message_t       message;        /* send-receive */
-        kfree_t         kfree;          /* free */
-        cratetask_t       cratetask;        /* add task */
-        allocatestack_t   allocatestack;    /* create stack */
-        setuptask_t     setuptask;      /* setup task */
-        stoptask_t      stoptask;       /* stop task */
-        deletetask_t    deletetask;     /* delete task */
-        starttask_t     starttask;      /* start task */
-        waitevent_t     waitevent;      /* wait event */
-        getpid_t        getpid;         /* Get pid */
+        kmalloc_t           kmalloc;        /* malloc */
+        message_t           message;        /* send-receive */
+        kfree_t             kfree;          /* free */
+        cratetask_t         cratetask;      /* add task */
+        allocatestack_t     allocatestack;  /* create stack */
+        getsetstack_t       getsetstack;    /* create stack */
+        setuptask_t         setuptask;      /* setup task */      /* 8 byte */
+        stoptask_t          stoptask;       /* stop task */
+        deletetask_t        deletetask;     /* delete task */
+        starttask_t         starttask;      /* start task */
+        waitevent_t         waitevent;      /* wait event */
+        getpid_t            getpid;         /* Get pid */
     };
 } kcall_t;
 
@@ -161,11 +170,11 @@ static int                  eventcode;     /* kernel event code */
  * TASK
  */
 
-typedef struct task_s {
-    QUEUE_HEADER
+typedef struct task_s {     /* 22 byte */
+    QUEUE_HEADER            /* 4 byte */
     char*           sp;            /* stack pointer */
     char*           sb;            /* stack bottom */
-    kcall_t         kcall;         /* kernel call parameters */
+    kcall_t         kcall;         /* kernel call parameters */ /* 10 byte */
     unsigned char   prio;          /* task priority */
     unsigned char   flags;         /* task flags */
     char            page;          /* page (-1 = invalid) */
@@ -193,6 +202,8 @@ enum {
 
     KRNL_CREATETASK,
     KRNL_ALLOCATESTACK,
+    KRNL_GETSTACK,
+    KRNL_SETSTACK,
     KRNL_SETUPTASK,
     KRNL_STARTTASK,
     KRNL_STOPTASK,
@@ -275,6 +286,19 @@ do_allocatestack (task_t* task, size_t size) {
 }
 
 /*
+static void
+do_setstack (task_t* task, char* ptr, size_t size) {
+
+    if (!ptr || !size) {
+        return;
+    }
+    task->sb = NULL;
+    task->sp = ptr + size - 1;
+    return;
+}
+*/
+
+/*
  * Push CPU context for a task
  */
 
@@ -283,8 +307,12 @@ do_setuptask (task_t* task, void (*tp)(void* args), void* args, void (*exitfn)(v
 
     cpu_context_t* ctxt;
 
-    do_pushstack(task, LOW(exitfn ? exitfn : exittask));
-    do_pushstack(task, HIGH(exitfn ? exitfn : exittask));
+    do_pushstack(task, LOW(exittask));
+    do_pushstack(task, HIGH(exittask));
+    if (exitfn) {
+        do_pushstack(task, LOW(exitfn));
+        do_pushstack(task, HIGH(exitfn));
+    }
 
     task->sp -= sizeof(cpu_context_t);
 
@@ -570,6 +598,12 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             CURRENT->kcall.allocatestack.ans.ptr =
                 do_allocatestack(wtask, CURRENT->kcall.allocatestack.ask.size);
 			break;
+
+          case KRNL_GETSTACK:
+            break;
+          case KRNL_SETSTACK:
+            break;
+            
 
           case KRNL_SETUPTASK:
 			wtask = CURRENT->kcall.setuptask.pid;
