@@ -7,7 +7,8 @@ Runs on ATmega1284p with 16k of RAM
 Features:
 - Minimal kernel, the OS is implemented with servers that
   communicate with each other using message passing
-- Virtual file system with inodes and UNIX-pipes
+- Virtual file system with inodes and UNIX-pipes - 
+  (filenames and folders are not implemented yet - you have to refer to each file with their device/inode duets)
 - Device drivers are also running as separate tasks (threads)
 - shell access via USART
 
