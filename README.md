@@ -5,7 +5,7 @@ Microkernel multitasking UNIX-like OS for Atmel AVR CPU
 Features:
 - Minimal kernel, the OS is implemented with servers that
   communicate with each other using message passing
-- Virtual file system with UNIX-pipes
+- Virtual file system with inodes and UNIX-pipes
 - Device drivers are also running as separate tasks (threads)
 - shell access via USART
 
@@ -34,15 +34,15 @@ Repository
     * src/init.c: init task, respawns sessions
 
 * servers:
-    * pm: process manager 
+    * pm: process manager -  
         process hierarchy, zombie processes, exit codes, wait
-    * vfs: virtual file server
+    * vfs: virtual file server - 
         file descriptors, filp table, inodes, open, close,
         dup, mknod, stat, etc...
     * sema: simple semaphore server (currently unused)
-    * ts: time server
+    * ts: time server - 
         sleep, uptime, real time
-    * es: executables server
+    * es: executables server - 
         registered runnable applications
         (because AVR is a Harvard architecture CPU)
 
