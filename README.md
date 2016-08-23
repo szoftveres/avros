@@ -13,8 +13,15 @@ Features:
 - shell access via USART
 
 
+
 Repository
 ==========
+
+* startup.c: first task and main function - 
+    The OS executes this task first. It creates the servers in
+    order (ts, vfs, es, pm, see below for meaning), sets up devices,
+    registers the executables, then finally spawns 'init' which
+    is the root task for every user task.
 
 * kernel: microkernel source code
 
