@@ -2,6 +2,8 @@
 
 Microkernel multitasking UNIX-like OS for Atmel AVR CPU
 
+Runs on ATmega1284p with 16k of RAM
+
 Features:
 - Minimal kernel, the OS is implemented with servers that
   communicate with each other using message passing
