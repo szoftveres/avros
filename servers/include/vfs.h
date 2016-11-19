@@ -6,9 +6,9 @@
 
 enum {   
     /* Answer types */
-    VFS_HOLD,
-    VFS_REPEAT,
-    VFS_FINAL,
+    VFS_HOLD,   /* Driver unblocks VFS but the user task remains blocked */
+    VFS_REPEAT, /* Driver indicates that more than one user tasks may be unblocked */
+    VFS_FINAL,  /* End of transaction, unblocking VFS and/or user task */
 
     /* Query types */
     VFS_RX_INTERRUPT,

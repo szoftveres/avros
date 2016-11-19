@@ -56,11 +56,12 @@ void usart0_event (void* args UNUSED) {
 }
 
 void
-usart0_serve_write(q_head_t* wr_q, vfsmsg_t *msg, int cmd) {
+usart0_serve_write(q_head_t* wr_q, vfsmsg_t *msg, int cmd_to_be_served) {
     vfsmsg_container_t*   container;
 
     container = (vfsmsg_container_t*)(Q_FIRST(*wr_q));
-    if (container && container->msg.cmd == cmd) {
+    if (container && container->msg.cmd == cmd_to_be_served) {
+        /* Request can be served, reply */
         char i = (msg->cmd == VFS_TX_INTERRUPT);
         UDR0 = (unsigned char) (i ? container->msg : *msg).rw.data;
         msg->client = (i ? container->msg : *msg).client;
@@ -68,6 +69,7 @@ usart0_serve_write(q_head_t* wr_q, vfsmsg_t *msg, int cmd) {
         msg->rw.bnum = 0;
         msg->cmd = VFS_FINAL;
     } else {
+        /* Save the request and hold */
         container = (vfsmsg_container_t*) kmalloc(sizeof(vfsmsg_container_t));
         memcpy(&(container->msg), msg, sizeof(vfsmsg_t));
         Q_END(wr_q, container);
@@ -94,11 +96,12 @@ usart0_print_char (q_head_t* wr_q, int c) {
  */
 
 void
-usart_serve_read(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
+usart_serve_read(q_head_t* rd_q, vfsmsg_t *msg, int cmd_to_be_served) {
     vfsmsg_container_t*   container;
 
     container = (vfsmsg_container_t*)(Q_FIRST(*rd_q));
-    if (container && container->msg.cmd == cmd) {
+    if (container && container->msg.cmd == cmd_to_be_served) {
+        /* Request can be served, reply */
         char i = (msg->cmd == VFS_RX_INTERRUPT);
         msg->client = (i ? container->msg : *msg).client;
         msg->rw.data = (i ? *msg : container->msg).interrupt.data;
@@ -106,6 +109,7 @@ usart_serve_read(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
         msg->rw.bnum = 0;
         msg->cmd = VFS_FINAL;
     } else {
+        /* Save the request and hold */
         container = (vfsmsg_container_t*) kmalloc(sizeof(vfsmsg_container_t));
         memcpy(&(container->msg), msg, sizeof(vfsmsg_t));
         Q_END(rd_q, container);
@@ -117,6 +121,7 @@ usart_serve_read(q_head_t* rd_q, vfsmsg_t *msg, int cmd) {
 void
 usart_reply_char (pid_t client, q_head_t* rd_q, int c) {
     vfsmsg_t msg;
+
     msg.cmd = VFS_RX_INTERRUPT;
     msg.client = NULL;
     msg.interrupt.data = c;
@@ -129,7 +134,7 @@ usart_reply_char (pid_t client, q_head_t* rd_q, int c) {
 
 
 void
-usart_flush (pid_t client, q_head_t* rd_q, char* buf, int* idx) {
+tty_flush (pid_t client, q_head_t* rd_q, char* buf, int* idx) {
     int    i;
     for (i = 0; i != *idx; i++) {
         usart_reply_char(client, rd_q, (int) buf[i]);
@@ -147,6 +152,7 @@ void tty_usart0 (void* args UNUSED) {
     int         idx;
     char        ttymode = 1;
 
+    kirqdis();
     q_init(&rd_q);
     q_init(&wr_q);
 
@@ -186,21 +192,21 @@ void tty_usart0 (void* args UNUSED) {
           case VFS_RX_INTERRUPT:
             if (!ttymode) {
                 usart_serve_read(&rd_q, &msg, VFS_READC);
-            } else {                
+            } else {
                 switch (msg.interrupt.data) {
                   case 0x04:        /* Ctrl + D */
                     if (!idx) {
                         usart_reply_char(client, &rd_q, EOF);
                     } else {
                         usart0_print_char(&wr_q, '\n');
-                        usart_flush(client, &rd_q, tbuf, &idx);
+                        tty_flush(client, &rd_q, tbuf, &idx);
                     }
                     break;
                   case 0x03:        /* Ctrl + C */
                     idx = 0;
                     usart0_print_char(&wr_q, '\n');
                     break;
-                  case 0x08:        /* Backspace */ 
+                  case 0x08:        /* Backspace */
                     if (idx) {
                         idx--;
                         usart0_print_char(&wr_q, msg.interrupt.data);
@@ -211,12 +217,12 @@ void tty_usart0 (void* args UNUSED) {
                   case '\n':        /* NewLine */
                     usart0_print_char(&wr_q, msg.interrupt.data);
                     tbuf[idx++] = msg.interrupt.data;
-                    usart_flush(client, &rd_q, tbuf, &idx);
+                    tty_flush(client, &rd_q, tbuf, &idx);
                     break;
                   default:
                     usart0_print_char(&wr_q, msg.interrupt.data);
                     tbuf[idx++] = msg.interrupt.data;
-                    break;                    
+                    break;
                 }
                 msg.cmd = VFS_HOLD;
             }
@@ -256,8 +262,10 @@ mf_find_empty_node (mfnode_t** list) {
 void memfile (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
-    mfnode_t** nodes = (mfnode_t**)kmalloc(sizeof(mfnode_t*) * MF_MAX_NODES); 
+    mfnode_t** nodes = (mfnode_t**)kmalloc(sizeof(mfnode_t*) * MF_MAX_NODES);
     memset(nodes, 0, (sizeof(mfnode_t*) * MF_MAX_NODES));
+
+    kirqdis();
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -283,7 +291,7 @@ void memfile (void* args UNUSED) {
                 break;
             }
             nodes[msg.link.ino]->links -= 1;
-            if (nodes[msg.link.ino]->refcnt || 
+            if (nodes[msg.link.ino]->refcnt ||
                 nodes[msg.link.ino]->links) {
                 /* more refs */
                 break;
@@ -305,7 +313,7 @@ void memfile (void* args UNUSED) {
                 break;
             }
             nodes[msg.iget.ino]->refcnt -= 1;
-            if (nodes[msg.iget.ino]->refcnt || 
+            if (nodes[msg.iget.ino]->refcnt ||
                 nodes[msg.iget.ino]->links) {
                 /* more refs */
                 break;
@@ -326,11 +334,11 @@ void memfile (void* args UNUSED) {
             }
             break;
           case VFS_READC:
-            if ((msg.rw.pos >= 127) || 
+            if ((msg.rw.pos >= 127) ||
                 (msg.rw.pos >= nodes[msg.rw.ino]->size)) {
                 msg.rw.data = EOF;
                 msg.rw.bnum = 0;
-            } else {     
+            } else {
                 msg.rw.data = nodes[msg.rw.ino]->file[msg.rw.pos];
                 msg.rw.bnum = 1;
             }
@@ -371,6 +379,7 @@ void pipedev (void* args UNUSED) {
 
     pdnode_t** nodes = (pdnode_t**)kmalloc(sizeof(pdnode_t*) * PD_MAX_NODES);
     memset(nodes, 0, (sizeof(pdnode_t*) * PD_MAX_NODES));
+    kirqdis();
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -397,7 +406,7 @@ void pipedev (void* args UNUSED) {
                 break;
             }
             nodes[msg.link.ino]->links -= 1;
-            if (nodes[msg.link.ino]->refcnt || 
+            if (nodes[msg.link.ino]->refcnt ||
                 nodes[msg.link.ino]->links) {
                 /* more refs */
                 break;

@@ -122,6 +122,7 @@ ts (void* args UNUSED) {
     time_t          globtime;
     char            ticks;
 
+    kirqdis();
     memset (&uptime, 0, sizeof(time_t));
     memset (&globtime, 0, sizeof(time_t));
     ticks = 0;
@@ -184,11 +185,11 @@ static pid_t            tstask;
 pid_t
 settspid (pid_t pid) {
     tstask = pid;
-    return (tstask); 
+    return (tstask);
 }
 
 /*
- * 
+ *
  */
 void
 delay (int ticks) {
@@ -200,7 +201,7 @@ delay (int ticks) {
 }
 
 /*
- * 
+ *
  */
 void
 getuptime (time_t* time) {
@@ -212,7 +213,7 @@ getuptime (time_t* time) {
 }
 
 /*
- * 
+ *
  */
 void
 gettime (time_t* time) {
@@ -224,14 +225,14 @@ gettime (time_t* time) {
 }
 
 /*
- * 
+ *
  */
 void
 settime (time_t* time) {
     tsmsg_t msg;
     msg.cmd = TS_SET_GLOBTIME;
     memcpy(&(msg.uptime), time, sizeof(time_t));
-    sendrec(tstask, &msg, sizeof(msg));    
+    sendrec(tstask, &msg, sizeof(msg));
     return;
 }
 

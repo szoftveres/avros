@@ -45,7 +45,7 @@ static void
 vfs_init (void) {
     memset(filp, 0, (sizeof(filp)));
     memset(devtab, 0, (sizeof(devtab)));
-    q_init(&vfs_task_q); 
+    q_init(&vfs_task_q);
 }
 
 /*
@@ -139,7 +139,7 @@ do_mkdev (vfsmsg_t *msg) {
     allocatestack(pid, DEFAULT_STACK_SIZE);
     setuptask(pid, msg->mkdev.ask.driver, msg->mkdev.ask.args, NULL);
     starttask(pid);
-    
+
     devtab[i] = pid;
 
     msg->cmd = VFS_MKDEV;
@@ -157,7 +157,7 @@ do_mknod (vfsmsg_t *msg) {
     int dev;
     int ino;
 
-    dev = msg->mknod.dev; 
+    dev = msg->mknod.dev;
     /* Create node on device */
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
     ino = msg->mknod.ino;
@@ -174,7 +174,7 @@ do_mknod (vfsmsg_t *msg) {
     return;
 }
 
-/* 
+/*
  *
  */
 
@@ -198,7 +198,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
 
     /* Assumption: device 0 is PIPE */
     dev = 0;
-    
+
     /* Create inode on device */
     msg->cmd = VFS_MKNOD;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
@@ -209,7 +209,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     ino = msg->mknod.ino;
 
     /* Get this new node  2x */
-    msg->cmd = VFS_IGET; 
+    msg->cmd = VFS_IGET;
     msg->iget.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
 
@@ -218,7 +218,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
         return; /* Cannot get node */
     }
 
-    msg->cmd = VFS_IGET; 
+    msg->cmd = VFS_IGET;
     msg->iget.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
 
@@ -226,7 +226,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
         msg->pipe.result = -1;
         return; /* Cannot get node */
     }
-    
+
     /* input */
     fp = find_empty_filp();
     if (fp < 0) {
@@ -299,7 +299,7 @@ do_open (vfs_task_t *client, vfsmsg_t *msg) {
         msg->openclose.fd = -1;
         return;
     }
-    
+
     filp[fp].refcnt++;
     client->fd[fd] = fp;
 
@@ -317,7 +317,7 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
 
     if (msg->openclose.fd < 0) {
         return; /* Nothing to close */
-    }   
+    }
     fp = client->fd[msg->openclose.fd];
     client->fd[msg->openclose.fd] = (-1);
     if (fp < 0) {
@@ -359,7 +359,7 @@ do_rw (vfs_task_t *client, vfsmsg_t *msg) {
     if (msg->rw.fd < 0) {
         msg->rw.data = EOF; /* wrong fd */
         return;
-    }   
+    }
     fp = client->fd[msg->rw.fd];
 
     if (fp < 0) {
@@ -374,7 +374,7 @@ do_rw (vfs_task_t *client, vfsmsg_t *msg) {
 
     while (msg->cmd == VFS_REPEAT) {
         msg->cmd = VFS_FINAL;
-        if (msg->client) { /* XXX This should not happen, ASSERT */
+        if (msg->client) {
             /* Unblocking waiting tasks(s) */
             send(msg->client, msg);
         }
@@ -487,12 +487,13 @@ vfs (void* args UNUSED) {
     vfs_task_t *vfs_client;
     vfsmsg_t msg;
 
+    kirqdis();
     vfs_init();
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         vfs_client = vfs_findbypid(client);
-        switch (msg.cmd) {    
+        switch (msg.cmd) {
 
           case VFS_ADDTASK:
             vfs_addnewtask(&msg);
@@ -542,7 +543,7 @@ vfs (void* args UNUSED) {
             do_rw(vfs_client, &msg);
             break;
         }
-        
+
         if ((msg.cmd != VFS_HOLD) && client) {
             msg.cmd = VFS_FINAL;
             send(client, &msg);
@@ -563,7 +564,7 @@ static pid_t            vfstask;
 pid_t
 setvfspid (pid_t pid) {
     vfstask = pid;
-    return (vfstask); 
+    return (vfstask);
 }
 
 /*
@@ -658,7 +659,7 @@ pipe (int pipefd[2]) {
     pipefd[1] = msg.pipe.fdo;
     return (msg.pipe.result);
 }
-/* 
+/*
  *
  */
 
@@ -667,12 +668,12 @@ fstat (char *name, struct stat *st_stat) {
     vfsmsg_t msg;
     msg.cmd = VFS_STAT;
     msg.stat.ask.name = name;
-    sendrec(vfstask, &msg, sizeof(msg));    
+    sendrec(vfstask, &msg, sizeof(msg));
     memcpy(st_stat, &msg.stat.ans.st_stat, sizeof(struct stat));
     return (msg.stat.ans.code);
 }
 
-/* 
+/*
  *
  */
 
@@ -695,7 +696,7 @@ open (char *name) {
     return (msg.openclose.fd);
 }
 
-/* 
+/*
  *
  */
 
@@ -708,7 +709,7 @@ close (int fd) {
     return;
 }
 
-/* 
+/*
  *
  */
 
