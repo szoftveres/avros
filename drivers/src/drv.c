@@ -42,7 +42,6 @@ void usart0_event (void* args UNUSED) {
         switch (waitevent(EVENT_USART0RX | EVENT_USART0TX)) {
           case EVENT_USART0RX:
             UCSR0B &= ~(1<<RXCIE0); /* Disable RXC interrupt */
-            msg.interrupt.data = UDR0; /* this will clear RXC flag */
             msg.cmd = VFS_RX_INTERRUPT;
             break;
           case EVENT_USART0TX:
@@ -190,6 +189,7 @@ void tty_usart0 (void* args UNUSED) {
             usart0_serve_write(&wr_q, &msg, VFS_TX_INTERRUPT);
             break;
           case VFS_RX_INTERRUPT:
+            msg.interrupt.data = UDR0;  /* Clear RX interrupt flag */
             if (!ttymode) {
                 usart_serve_read(&rd_q, &msg, VFS_READC);
             } else {

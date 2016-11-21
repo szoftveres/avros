@@ -1,7 +1,7 @@
 #include <avr/interrupt.h>
 #include <string.h>
 #include "../../lib/include/queue.h"
-#include "../include/sys.h"
+#include "../include/hal.h"
 #include "../include/kernel.h"
 /*
  * ADD TASK
@@ -76,7 +76,7 @@ typedef struct starttask_s {
 typedef struct setuptask_s {
     pid_t           pid;            /* pid */
     void(*ptr)(void* args);         /* task entry */
-    void* args;                     /* arguments */
+    void *args;                     /* arguments */
     void(*exitfn)(void);            /* arguments */
 } setuptask_t;
 
@@ -162,7 +162,7 @@ static q_head_t             queue[TASK_PRIO_QUEUE_MAX];
 static q_head_t             current_q;
 static q_head_t             blocked_q;
 
-static int                  eventcode;     /* kernel event code */
+int                         eventcode;     /* kernel event code */
 
 #define CURRENT         ((task_t*)(Q_FIRST(current_q)))
 
@@ -322,7 +322,7 @@ do_setuptask (task_t* task, void (*tp)(void* args), void* args, void (*exitfn)(v
     ctxt->r25 = HIGH(args);
     ctxt->retLow = LOW(tp);
     ctxt->retHigh = HIGH(tp);
-    ctxt->r1 = 0;                                   /* GCC needs r1 to be 0x00 */
+    ctxt->r1 = 0;       /* GCC needs r1 to be 0x00 */
     return;
 }
 
@@ -340,65 +340,6 @@ void switchtokernel (void) {
     SET_SP(kerneltask->sp);
     RESTORE_CONTEXT();
     RETURN();
-}
-
-#define SET_EVENTCODE_AND_JMP_TO_HANDLER(x)     \
-    do {                                        \
-        asm("\n\tpush   r24"                    \
-            "\n\tpush   r25"::);                \
-        eventcode = (x);                        \
-        asm("\n\tpop    r25"                    \
-            "\n\tpop    r24"                    \
-            "\n\tjmp switchtokernel\n\t"::);    \
-    } while(0)
-
-/**
- * software trap
- */
-void swtrap (void) __attribute__ ((naked));
-void swtrap (void) {
-    LOCK();
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_NONE);
-}
-
-/**
- * timer1 interrupt handler
- */
-ISR (TIMER1_OVF_vect) __attribute__ ((signal, naked));
-ISR (TIMER1_OVF_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_TIMER1OVF);
-}
-
-/**
- * USART0 RX COMPLETE interrupt handler
- */
-ISR (USART0_RX_vect) __attribute__ ((signal, naked));
-ISR (USART0_RX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART0RX);
-}
-
-/**
- * USART0 TX COMPLETE interrupt handler
- */
-ISR (USART0_TX_vect) __attribute__ ((signal, naked));
-ISR (USART0_TX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART0TX);
-}
-
-/**
- * USART1 RX COMPLETE interrupt handler
- */
-ISR (USART1_RX_vect) __attribute__ ((signal, naked));
-ISR (USART1_RX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART1RX);
-}
-
-/**
- * USART1 TX COMPLETE interrupt handler
- */
-ISR (USART1_TX_vect) __attribute__ ((signal, naked));
-ISR (USART1_TX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART1TX);
 }
 
 /*
@@ -579,8 +520,8 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
 			continue;
 		}
 
-		/* handle kernel call*/
-		switch (CURRENT->kcall.code) {
+        /* handle kernel call*/
+        switch (CURRENT->kcall.code) {
 
 		  case KRNL_CREATETASK:  /* Add a new task entry in the blocked queue */
 			wtask = (pid_t) Q_FRONT(&blocked_q, newtask());
@@ -603,7 +544,6 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             break;
           case KRNL_SETSTACK:
             break;
-            
 
           case KRNL_SETUPTASK:
 			wtask = CURRENT->kcall.setuptask.pid;
@@ -650,7 +590,6 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
 			break;
 
 		  case KRNL_MALLOC:         /* Allocate memory */
-
 			CURRENT->kcall.kmalloc.ans.ptr =
                     malloc(CURRENT->kcall.kmalloc.ask.size);
 			break;
