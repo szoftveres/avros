@@ -134,7 +134,7 @@ typedef struct getpid_s {
 
 typedef struct kcall_s {    /* 10 byte */
     int                 code;     /* kernel call code */
-    union { 
+    union {
         kmalloc_t           kmalloc;        /* malloc */
         message_t           message;        /* send-receive */
         kfree_t             kfree;          /* free */
@@ -237,8 +237,7 @@ init_task_queues (void) {
  */
 
 static task_t*
-newtask (void)
-{
+newtask (void) {
     task_t* ptsk;
     ptsk = (task_t*) malloc(sizeof(task_t));
     if (ptsk) {
@@ -298,10 +297,71 @@ do_setstack (task_t* task, char* ptr, size_t size) {
 }
 */
 
+
+#define GETP0(ctxt)                                                     \
+    ((((unsigned int)(ctxt)->r25) << 8) | (unsigned int)(ctxt)->r24)    \
+
+#define SETP0(ctxt, v)                                                  \
+    do {                                                                \
+        (ctxt)->r25 = HIGH(v);                                          \
+        (ctxt)->r24 = LOW(v);                                           \
+    } while (0)                                                         \
+
+
+#define GETP1(ctxt)                                                     \
+    ((((unsigned int)(ctxt)->r23) << 8) | (unsigned int)(ctxt)->r22)    \
+
+#define SETP1(ctxt, v)                                                  \
+    do {                                                                \
+        (ctxt)->r23 = HIGH(v);                                          \
+        (ctxt)->r22 = LOW(v);                                           \
+    } while (0)                                                         \
+
+
+#define GETP2(ctxt)                                                     \
+    ((((unsigned int)(ctxt)->r21) << 8) | (unsigned int)(ctxt)->r20)    \
+
+#define SETP2(ctxt, v)                                                  \
+    do {                                                                \
+        (ctxt)->r21 = HIGH(v);                                          \
+        (ctxt)->r20 = LOW(v);                                           \
+    } while (0)                                                         \
+
+
+#define GETP3(ctxt)                                                     \
+    ((((unsigned int)(ctxt)->r19) << 8) | (unsigned int)(ctxt)->r18)    \
+
+#define SETP3(ctxt, v)                                                  \
+    do {                                                                \
+        (ctxt)->r19 = HIGH(v);                                          \
+        (ctxt)->r18 = LOW(v);                                           \
+    } while (0)                                                         \
+
+
+#define GETP4(ctxt)                                                     \
+    ((((unsigned int)(ctxt)->r17) << 8) | (unsigned int)(ctxt)->r16)    \
+
+#define SETP4(ctxt, v)                                                  \
+    do {                                                                \
+        (ctxt)->r17 = HIGH(v);                                          \
+        (ctxt)->r16 = LOW(v);                                           \
+    } while (0)                                                         \
+
+
+#define GETP5(ctxt)                                                     \
+    ((((unsigned int)(ctxt)->r15) << 8) | (unsigned int)(ctxt)->r14)    \
+
+#define SETP5(ctxt, v)                                                  \
+    do {                                                                \
+        (ctxt)->r15 = HIGH(v);                                          \
+        (ctxt)->r14 = LOW(v);                                           \
+    } while (0)                                                         \
+
+
+
 /*
  * Push CPU context for a task
  */
-
 static void
 do_setuptask (task_t* task, void (*tp)(void* args), void* args, void (*exitfn)(void)) {
 
@@ -323,6 +383,7 @@ do_setuptask (task_t* task, void (*tp)(void* args), void* args, void (*exitfn)(v
     ctxt->retLow = LOW(tp);
     ctxt->retHigh = HIGH(tp);
     ctxt->r1 = 0;       /* GCC needs r1 to be 0x00 */
+
     return;
 }
 
