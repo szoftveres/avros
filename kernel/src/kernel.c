@@ -214,6 +214,7 @@ enum {
     KRNL_IRQDIS,
 
     KRNL_GETPID,
+    KRNL_TEST,
 
 };
 
@@ -700,6 +701,16 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
 
 		  case KRNL_YIELD:          /* Let other tasks running */
             Q_END(&queue[old->prio], Q_REMV(&current_q, CURRENT));
+            break;
+
+          case KRNL_TEST:          /* test */
+            {
+                cpu_context_t *ctxt;
+
+                ctxt = (cpu_context_t*)(CURRENT->sp + sizeof(void*) + 1);
+                SETP0(ctxt, GETP1(ctxt));
+            }
+            break;
 
 		  default:
 			break;
@@ -919,10 +930,94 @@ kirqen(void) {
  *
  */
 
+
 void
 kirqdis(void) {
     CURRENT->kcall.code = (KRNL_IRQDIS);
     swtrap();
     return;
 }
+
+
+int
+kcall5 (int code, int p1, int p2, int p3, int p4, int p5)
+__attribute__ ((naked));
+
+int
+kcall5 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
+        int p3 UNUSED, int p4 UNUSED, int p5 UNUSED) {
+    swtrap();
+    RETURN();
+}
+
+int
+kcall4 (int code, int p1, int p2, int p3, int p4)
+__attribute__ ((naked));
+
+int
+kcall4 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
+        int p3 UNUSED, int p4 UNUSED) {
+    swtrap();
+    RETURN();
+}
+
+int
+kcall3 (int code, int p1, int p2, int p3)
+__attribute__ ((naked));
+
+int
+kcall3 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
+        int p3 UNUSED) {
+    swtrap();
+    RETURN();
+}
+
+int
+kcall2 (int code, int p1, int p2)
+__attribute__ ((naked));
+
+int
+kcall2 (int code UNUSED, int p1 UNUSED, int p2 UNUSED) {
+    swtrap();
+    RETURN();
+}
+
+int
+kcall1 (int code, int p1)
+__attribute__ ((naked));
+
+int
+kcall1 (int code UNUSED, int p1 UNUSED) {
+    swtrap();
+    RETURN();
+}
+
+int
+kcall0 (int code)
+__attribute__ ((naked));
+
+int
+kcall0 (int code UNUSED) {
+    swtrap();
+    RETURN();
+}
+
+
+
+
+char
+ktest (char v) {
+    return (char)(kcall1(KRNL_TEST, (int) v));
+}
+
+
+
+void
+foo(void) {
+    ktest('h');
+}
+
+
+
+
 
