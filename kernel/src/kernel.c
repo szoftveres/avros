@@ -579,6 +579,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
                 Q_FRONT(&current_q, Q_REMV(&blocked_q, wtask));
                 wtask->kcall.waitevent.event = eventcode;
             }
+            eventcode = EVENT_NONE;
 			continue;
 		}
 
@@ -939,85 +940,9 @@ kirqdis(void) {
 }
 
 
-int
-kcall5 (int code, int p1, int p2, int p3, int p4, int p5)
-__attribute__ ((naked));
-
-int
-kcall5 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
-        int p3 UNUSED, int p4 UNUSED, int p5 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall4 (int code, int p1, int p2, int p3, int p4)
-__attribute__ ((naked));
-
-int
-kcall4 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
-        int p3 UNUSED, int p4 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall3 (int code, int p1, int p2, int p3)
-__attribute__ ((naked));
-
-int
-kcall3 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
-        int p3 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall2 (int code, int p1, int p2)
-__attribute__ ((naked));
-
-int
-kcall2 (int code UNUSED, int p1 UNUSED, int p2 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall1 (int code, int p1)
-__attribute__ ((naked));
-
-int
-kcall1 (int code UNUSED, int p1 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall0 (int code)
-__attribute__ ((naked));
-
-int
-kcall0 (int code UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-
-
-
 char
 ktest (char v) {
     return (char)(kcall1(KRNL_TEST, (int) v));
 }
-
-
-
-void
-foo(void) {
-    ktest('h');
-}
-
-
-
 
 
