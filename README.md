@@ -1,17 +1,14 @@
 # avros
 
-Microkernel multitasking UNIX-like embedded OS for Atmel AVR CPUs
+UNIX-like embedded microkernel OS for Atmel AVR CPUs
 
 Runs on ATmega1284p with 16k RAM
 
 Features:
-- Minimal kernel, the OS entity is defined by servers that
-  communicate with each other using message passing
-- Multiple OS entities can exist on the same CPU without interferring
-  with each other
-- Preemptive and/or cooperative multitasking
-- Virtual file system with inodes and UNIX-pipes - unified driver interface
-  (filenames and folders are not implemented yet - you have to refer to each file with their respective device/inode duets, e.g. syntax: '2/1')
+- Minimal microkernel with message passing facilities, the OS entity is defined by the servers that communicate with each other via the kernel
+- Multiple OS entities can coexist on the same CPU without interferring with each other
+- Cooperative and/or timer interrupt based preemptive multitasking
+- Virtual file system with UNIX-pipes - (filenames and folders are not implemented yet - you have to refer to each file with their respective device/inode number duets, e.g. syntax: '2/1')
 - Device drivers are running as separate tasks (threads), including pipe device
 - Unified device driver interface
 - shell access via USARTs, multiple sessions can be spawned upon init.
@@ -21,13 +18,13 @@ Features:
 Repository
 ==========
 
-* startup.c: first task and main function - 
+* main.c: first task and main function - 
     The OS executes this task first. It creates the servers in
     order (ts, vfs, es, pm, see below for meaning), sets up devices,
     registers the executables, then finally spawns 'init' which
     is the root task for every user task.
 
-* kernel: microkernel source code - 
+* kernel: microkernel and HAL (hardware abstraction layer) source code 
     * Basic functionalities: task creation and scheduling (priority round
       robin), message passing, interrupt handling, memory allocation
       (memory manager server is under development, see misc/)
@@ -41,10 +38,10 @@ Repository
         * login
         * echo
         * cat
-        * cap (turns lower case letters to capitals, for testing)
+        * cap (turns lower case letters to capitals, only for testing)
         * sleep
         * xargs
-        * repeat (for testing)
+        * repeat (only for testing)
         * uptime
         * stat
         * grep (only string matching, no wildcards)
@@ -56,7 +53,7 @@ Repository
         * Background jobs with '&'
         * Multiple jobs with ';'
         * comment with '#'
-        * ignore next char with '\' prefix
+        * ignore next char with '\\' prefix
 
     * src/init.c: init task, respawns sessions
 
@@ -71,8 +68,8 @@ Repository
         sleep(), uptime, real time
     * es: executables server - 
         registers runnable applications and provides them to pm when a
-        task calls exec() (AVR is a Harvard architecture CPU, it cannot
-        load the binary to its flash from the disk)
+        task calls exec() (AVR is a Harvard architecture CPU, the OS cannot
+        load the binary and burn it into the flash program memory)
 
 * drivers:
     * tty_usart0: interrupt-driven tty driver for USART 0 device
