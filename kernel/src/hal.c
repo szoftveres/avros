@@ -203,51 +203,6 @@ ISR (USART1_TX_vect) { /* GIE cleared automatically */
     SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART1TX);
 }
 
-
-
-
-
-int
-kcall5 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
-        int p3 UNUSED, int p4 UNUSED, int p5 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall4 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
-        int p3 UNUSED, int p4 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall3 (int code UNUSED, int p1 UNUSED, int p2 UNUSED,
-        int p3 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall2 (int code UNUSED, int p1 UNUSED, int p2 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall1 (int code UNUSED, int p1 UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-int
-kcall0 (int code UNUSED) {
-    swtrap();
-    RETURN();
-}
-
-
-
 /*
  *
  */

@@ -188,35 +188,38 @@ typedef struct task_s {     /* 22 byte */
  * kernel call codes
  */
 
-enum {
-    KRNL_YIELD          = 0,
+#define KRNL_YIELD          0x00
+#define KRNL_GETPID         0x01
+#define KRNL_TEST           0x02
 
-    KRNL_WAITEVENT,
+#define KRNL_IRQEN          0x10
+#define KRNL_IRQDIS         0x11
 
-    KRNL_MALLOC,
-    KRNL_FREE,
+#define KRNL_CREATETASK     0x20
+#define KRNL_ALLOCATESTACK  0x21
+#define KRNL_GETSTACK       0x22
+#define KRNL_SETSTACK       0x23
+#define KRNL_SETUPTASK      0x24
+#define KRNL_STARTTASK      0x25
+#define KRNL_STOPTASK       0x26
+#define KRNL_DELETETASK     0x27
+#define KRNL_EXITTASK       0x28
 
-    KRNL_SEND,
-	KRNL_SENDREC,
-    KRNL_RECEIVE,
+#define KRNL_MALLOC         0x30
+#define KRNL_FREE           0x31
 
-    KRNL_CREATETASK,
-    KRNL_ALLOCATESTACK,
-    KRNL_GETSTACK,
-    KRNL_SETSTACK,
-    KRNL_SETUPTASK,
-    KRNL_STARTTASK,
-    KRNL_STOPTASK,
-    KRNL_DELETETASK,
-    KRNL_EXITTASK,
+#define KRNL_SEND           0x40
+#define KRNL_SENDREC        0x41
+#define KRNL_RECEIVE        0x42
 
-    KRNL_IRQEN,
-    KRNL_IRQDIS,
+#define KRNL_WAITEVENT      0x50
 
-    KRNL_GETPID,
-    KRNL_TEST,
 
-};
+
+
+#define STRINGIFY_(a) #a
+#define STRINGIFY(a) STRINGIFY_(a)
+
 
 /*
  *
@@ -941,8 +944,11 @@ kirqdis(void) {
 
 
 char
-ktest (char v) {
-    return (char)(kcall1(KRNL_TEST, (int) v));
+ktest (char v UNUSED) {
+    register uint16_t ret __asm__ ("r24");
+    asm volatile("ldi  r16, " STRINGIFY(KRNL_TEST) "\n\t" ::);
+    swtrap();
+    return ret;
 }
 
 

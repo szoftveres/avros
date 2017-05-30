@@ -167,33 +167,6 @@ typedef struct cpu_context_s {
 void swtrap (void ) __attribute__ ((naked));
 
 
-int
-kcall5 (int code, int p1, int p2, int p3, int p4, int p5)
-__attribute__ ((naked,noreturn));
-
-int
-kcall4 (int code, int p1, int p2, int p3, int p4)
-__attribute__ ((naked,noreturn));
-
-int
-kcall3 (int code, int p1, int p2, int p3)
-__attribute__ ((naked,noreturn));
-
-int
-kcall2 (int code, int p1, int p2)
-__attribute__ ((naked,noreturn));
-
-int
-kcall1 (int code, int p1)
-__attribute__ ((naked,noreturn));
-
-int
-kcall0 (int code)
-__attribute__ ((naked,noreturn));
-
-
-
-
 void cpu_sleep (void);
 
 #endif
