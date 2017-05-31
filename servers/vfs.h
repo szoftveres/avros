@@ -1,8 +1,8 @@
 #ifndef _VFS_H_
 #define _VFS_H_
 
-#include "../../lib/include/queue.h"
-#include "../../lib/include/mstddef.h"
+#include "../lib/queue.h"
+#include "../lib/mstddef.h"
 
 enum {   
     /* Answer types */

@@ -1,7 +1,7 @@
-#include "../../kernel/include/kernel.h"
-#include "../../lib/include/queue.h"
-#include "../../lib/include/mstddef.h"
-#include "../include/vfs.h"
+#include "../kernel/kernel.h"
+#include "../lib/queue.h"
+#include "../lib/mstddef.h"
+#include "vfs.h"
 
 /*
  * DEVTAB

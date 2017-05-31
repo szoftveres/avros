@@ -1,7 +1,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "../../kernel/include/kernel.h"
-#include "../include/hal.h"
+#include "kernel.h"
+#include "hal.h"
 
 
 extern int eventcode;

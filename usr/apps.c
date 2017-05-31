@@ -1,13 +1,13 @@
-#include "../../kernel/include/kernel.h"
-#include "../../servers/include/ts.h"
-#include "../../servers/include/pm.h"
-#include "../../servers/include/vfs.h"
-#include "../../lib/include/mstddef.h"  /* EOF */
+#include "../kernel/kernel.h"
+#include "../servers/ts.h"
+#include "../servers/pm.h"
+#include "../servers/vfs.h"
+#include "../lib/mstddef.h"  /* EOF */
 
-#include "../lib/include/mstdlib.h"
+#include "lib/mstdlib.h"
 #include <string.h>
 
-#include "../include/apps.h"
+#include "apps.h"
 
 /*
 ================================================================================

@@ -49,40 +49,40 @@ all: $(TARGET) os.hex os.eep os.lss size
 main.o: ../main.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-kernel.o: ../kernel/src/kernel.c
+kernel.o: ../kernel/kernel.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-hal.o: ../kernel/src/hal.c
+hal.o: ../kernel/hal.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-drv.o: ../drivers/src/drv.c
+drv.o: ../drivers/drv.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-queue.o: ../lib/src/queue.c
+queue.o: ../lib/queue.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-es.o: ../servers/src/es.c
+es.o: ../servers/es.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-pm.o: ../servers/src/pm.c
+pm.o: ../servers/pm.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-ts.o: ../servers/src/ts.c
+ts.o: ../servers/ts.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-vfs.o: ../servers/src/vfs.c
+vfs.o: ../servers/vfs.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-mstdlib.o: ../usr/lib/src/mstdlib.c
+mstdlib.o: ../usr/lib/mstdlib.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-apps.o: ../usr/src/apps.c
+apps.o: ../usr/apps.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-init.o: ../usr/src/init.c
+init.o: ../usr/init.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
-sh.o: ../usr/src/sh.c
+sh.o: ../usr/sh.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c  $<
 
 ##Link

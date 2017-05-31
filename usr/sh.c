@@ -1,12 +1,12 @@
-#include "../../kernel/include/kernel.h"
-#include "../../servers/include/vfs.h"
-#include "../../servers/include/pm.h"
+#include "../kernel/kernel.h"
+#include "../servers/vfs.h"
+#include "../servers/pm.h"
 
-#include "../../lib/include/mstddef.h"
-#include "../lib/include/mstdlib.h"
+#include "../lib/mstddef.h"
+#include "lib/mstdlib.h"
 #include <string.h>
 
-#include "../include/sh.h"
+#include "sh.h"
 
 /**
 */

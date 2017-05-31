@@ -1,11 +1,11 @@
 #include <avr/io.h>
-#include "../../kernel/include/kernel.h"
+#include "../kernel/kernel.h"
 
-#include "../../servers/include/vfs.h"
-#include "../../lib/include/queue.h"
-#include "../../lib/include/mstddef.h"
+#include "../servers/vfs.h"
+#include "../lib/queue.h"
+#include "../lib/mstddef.h"
 
-#include "../include/drv.h"
+#include "drv.h"
 /*
 ================================================================================
  */
