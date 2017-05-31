@@ -1,7 +1,7 @@
 #!/bin/bash
 
-cd ./default
-make || exit 1
+make clean || exit 1
+make all || exit 1
 
 echo Press ENTER to burn
 read EMPTYLINE
