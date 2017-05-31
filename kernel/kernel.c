@@ -225,6 +225,39 @@ typedef struct task_s {     /* 22 byte */
  *
  */
 
+void switchtokernel (void) __attribute__ ((naked));
+void switch_from_kernel (void) __attribute__ ((naked));
+
+
+void switchtokernel (void) {
+    SAVE_CONTEXT();
+    CURRENT->sp = GET_SP();
+    SET_SP(kerneltask->sp);
+    RESTORE_CONTEXT();
+    RETURN();
+}
+
+
+void switch_from_kernel (void) {
+    SAVE_CONTEXT();
+    kerneltask->sp = GET_SP();
+    SET_SP(CURRENT->sp);
+    if (CURRENT->flags & TASK_FLAG_IRQDIS) {
+        /* Don't turn on interrupts  */
+        RESTORE_CONTEXT();
+        RETURN();
+    } else {
+        /* Enable interrupts after return */
+        RESTORE_CONTEXT();
+        RETI();
+    }
+}
+
+
+/*
+ *
+ */
+
 static void
 init_task_queues (void) {
     int i;
@@ -302,67 +335,6 @@ do_setstack (task_t* task, char* ptr, size_t size) {
 */
 
 
-#define GETP0(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r25) << 8) | (unsigned int)(ctxt)->r24)    \
-
-#define SETP0(ctxt, v)                                                  \
-    do {                                                                \
-        (ctxt)->r25 = HIGH(v);                                          \
-        (ctxt)->r24 = LOW(v);                                           \
-    } while (0)                                                         \
-
-
-#define GETP1(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r23) << 8) | (unsigned int)(ctxt)->r22)    \
-
-#define SETP1(ctxt, v)                                                  \
-    do {                                                                \
-        (ctxt)->r23 = HIGH(v);                                          \
-        (ctxt)->r22 = LOW(v);                                           \
-    } while (0)                                                         \
-
-
-#define GETP2(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r21) << 8) | (unsigned int)(ctxt)->r20)    \
-
-#define SETP2(ctxt, v)                                                  \
-    do {                                                                \
-        (ctxt)->r21 = HIGH(v);                                          \
-        (ctxt)->r20 = LOW(v);                                           \
-    } while (0)                                                         \
-
-
-#define GETP3(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r19) << 8) | (unsigned int)(ctxt)->r18)    \
-
-#define SETP3(ctxt, v)                                                  \
-    do {                                                                \
-        (ctxt)->r19 = HIGH(v);                                          \
-        (ctxt)->r18 = LOW(v);                                           \
-    } while (0)                                                         \
-
-
-#define GETP4(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r17) << 8) | (unsigned int)(ctxt)->r16)    \
-
-#define SETP4(ctxt, v)                                                  \
-    do {                                                                \
-        (ctxt)->r17 = HIGH(v);                                          \
-        (ctxt)->r16 = LOW(v);                                           \
-    } while (0)                                                         \
-
-
-#define GETP5(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r15) << 8) | (unsigned int)(ctxt)->r14)    \
-
-#define SETP5(ctxt, v)                                                  \
-    do {                                                                \
-        (ctxt)->r15 = HIGH(v);                                          \
-        (ctxt)->r14 = LOW(v);                                           \
-    } while (0)                                                         \
-
-
-
 /*
  * Push CPU context for a task
  */
@@ -391,42 +363,6 @@ do_setuptask (task_t* task, void (*tp)(void* args), void* args, void (*exitfn)(v
     return;
 }
 
-
-
-/*
- * Switch to kernel task
- */
-
-void switchtokernel (void) __attribute__ ((naked));
-
-void switchtokernel (void) {
-    SAVE_CONTEXT();
-    CURRENT->sp = GET_SP();
-    SET_SP(kerneltask->sp);
-    RESTORE_CONTEXT();
-    RETURN();
-}
-
-/*
- * Switch to user task
- */
-
-void switch_from_kernel (void) __attribute__ ((naked));
-
-void switch_from_kernel (void) {
-    SAVE_CONTEXT();
-    kerneltask->sp = GET_SP();
-    SET_SP(CURRENT->sp);
-    if (CURRENT->flags & TASK_FLAG_IRQDIS) {
-        /* Don't turn on interrupts  */
-        RESTORE_CONTEXT();
-        RETURN();
-    } else {
-        /* Enable interrupts after return */
-        RESTORE_CONTEXT();
-        RETI();
-    }
-}
 
 /*
  * Check whether a task waits for an event
