@@ -92,6 +92,7 @@ void kirqen(void);
 void kirqdis(void);
 
 char ktest (char v);
+char ktest2 (char a, int b, int c, char d);
 
 
 /*

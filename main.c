@@ -21,9 +21,6 @@ startup (void* args UNUSED) {
     pid_t pid;
     char** initc;
 
-    char h = ktest('h');
-    h += 1;
-
     /* starting time server */
     pid = cratetask(TASK_PRIO_RT, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE);

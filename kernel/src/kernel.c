@@ -951,4 +951,10 @@ ktest (char v UNUSED) {
     return ret;
 }
 
+char ktest2 (char a UNUSED, int b UNUSED, int c UNUSED, char d UNUSED) {
+    register uint16_t ret __asm__ ("r24");
+    asm volatile("ldi  r16, " STRINGIFY(KRNL_TEST) "\n\t" ::);
+    swtrap();
+    return ret;
+}
 
