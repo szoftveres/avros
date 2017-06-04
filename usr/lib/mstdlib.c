@@ -102,50 +102,50 @@ initgetopt (void) {
 
 int
 getopt (char* argv[], char* opts, getopt_p opt_p) {
-	int c;
-	char *cp;
+    int c;
+    char *cp;
 
     if (!opt_p) {
         return (EOF);
     }
-	if (opt_p->sp == 1) {
-		if ((opt_p->optind >= argc(argv)) ||
-		   (argv[opt_p->optind][0] != '-') ||
+    if (opt_p->sp == 1) {
+        if ((opt_p->optind >= argc(argv)) ||
+           (argv[opt_p->optind][0] != '-') ||
            (argv[opt_p->optind][1] == '\0')) {
-			return (EOF);
+            return (EOF);
         } else if (!strcmp(argv[opt_p->optind], "--")) {
-			opt_p->optind++;
-			return (EOF);
-		}
-    }
-	c = argv[opt_p->optind][opt_p->sp];
-	if ((c == ':') || ((cp=strchr(opts, c)) == NULL)) {
-        mfprintf(STDERR, "%s: -%c?\n", argv[0], c);
-		if (argv[opt_p->optind][++opt_p->sp] == '\0') {
-			opt_p->optind++;
-			opt_p->sp = 1;
-		}
-		return ('?');
-	}
-	if (*++cp == ':') {
-		if (argv[opt_p->optind][opt_p->sp+1] != '\0') {
-			opt_p->optarg = &argv[opt_p->optind++][opt_p->sp+1];
-        } else if (++opt_p->optind >= argc(argv)) {
-		    mfprintf(STDERR, "%s: -%c needs arg\n", argv[0], c);
-			opt_p->sp = 1;
-			return ('?');
-		} else {
-			opt_p->optarg = argv[opt_p->optind++];
+            opt_p->optind++;
+            return (EOF);
         }
-		opt_p->sp = 1;
-	} else {
-		if (argv[opt_p->optind][++opt_p->sp] == '\0') {
-			opt_p->sp = 1;
-			opt_p->optind++;
-		}
-		opt_p->optarg = NULL;
-	}
-	return (c);
+    }
+    c = argv[opt_p->optind][opt_p->sp];
+    if ((c == ':') || ((cp=strchr(opts, c)) == NULL)) {
+        mfprintf(STDERR, "%s: -%c?\n", argv[0], c);
+        if (argv[opt_p->optind][++opt_p->sp] == '\0') {
+            opt_p->optind++;
+            opt_p->sp = 1;
+        }
+        return ('?');
+    }
+    if (*++cp == ':') {
+        if (argv[opt_p->optind][opt_p->sp+1] != '\0') {
+            opt_p->optarg = &argv[opt_p->optind++][opt_p->sp+1];
+        } else if (++opt_p->optind >= argc(argv)) {
+            mfprintf(STDERR, "%s: -%c needs arg\n", argv[0], c);
+            opt_p->sp = 1;
+            return ('?');
+        } else {
+            opt_p->optarg = argv[opt_p->optind++];
+        }
+        opt_p->sp = 1;
+    } else {
+        if (argv[opt_p->optind][++opt_p->sp] == '\0') {
+            opt_p->sp = 1;
+            opt_p->optind++;
+        }
+        opt_p->optarg = NULL;
+    }
+    return (c);
 }
 
 

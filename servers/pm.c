@@ -43,7 +43,7 @@ typedef union spawn_u {
     struct {
         int(*ptp)(char**);              /* task entry */
         size_t  stack;                  /* stack size */
-	    char**  argv;                   /* argv */
+        char**  argv;                   /* argv */
     } ask;
     struct {
         pid_t pid;                      /* pid */
@@ -155,7 +155,7 @@ pm_findbypid (pid_t pid) {
 static q_item_t*
 pm_haschild (q_head_t* que UNUSED, q_item_t* ptsk) {
     if (((pm_task_t*)ptsk)->parent != PM_CLIENT) {
-		return NULL;
+        return NULL;
     }
     return (ptsk);
 }
@@ -172,7 +172,7 @@ pm_findzombie (q_head_t* que UNUSED, q_item_t* ptsk) {
     if (((PM_CLIENT->waitfor != PM_PIDOF(((pm_task_t*)ptsk)))
          && (PM_CLIENT->waitfor != TASK_ANY))){
         return (NULL);
-	}
+    }
     return (ptsk);
 }
 
@@ -324,9 +324,9 @@ cook_argstack (char* bottom, char* orgargv[]) {
     bottom += (sizeof(char*) * (num + 1));
     for (i=0; (i < num) && (orgargv) && (orgargv[i]); i++) {
         newargv[i] = bottom;
-		strcpy(bottom, orgargv[i]);
-		bottom += (strlen(orgargv[i]) + 1); //  string + `\0`
-	}
+        strcpy(bottom, orgargv[i]);
+        bottom += (strlen(orgargv[i]) + 1); //  string + `\0`
+    }
     newargv[i] = NULL;
 }
 
@@ -493,7 +493,7 @@ do_exit (pmmsg_t* msg, pid_t* replyto) {
         PM_CLIENT->exitcode = msg->exit.code;
         Q_END(&zombie_q, Q_REMV(&task_q, PM_CLIENT));
         /* Client is now zombie */
-	    return 0; /* No reply */
+        return 0; /* No reply */
     }
     return 1;
 }
@@ -507,7 +507,7 @@ do_wait (pmmsg_t* msg) {
 
     PM_CLIENT->waitfor = msg->wait.ask.pid;
     pm_task = (pm_task_t*) q_forall(&zombie_q, pm_findzombie);
-    if (pm_task) {	/* found a zombie child */
+    if (pm_task) {  /* found a zombie child */
         msg->wait.ans.pid = PM_PIDOF(pm_task); /* PID */
         msg->wait.ans.code = pm_task->exitcode; /*Exit Code*/
         kfree(pm_task->args);
@@ -563,7 +563,7 @@ pm (void* args) {
             if (!do_exit(&msg, &msg_client)) {
                 continue;
             }
-	        break;
+            break;
 
           case PM_WAIT:
             if (!do_wait(&msg)) {
@@ -647,7 +647,7 @@ pid_t
 wait (int* code) {
     pmmsg_t msg;
     msg.cmd = PM_WAIT;
-	msg.wait.ask.pid = TASK_ANY;
+    msg.wait.ask.pid = TASK_ANY;
     sendrec(pmtask, &msg, sizeof(msg));
     if(code){
         *code = msg.wait.ans.code;
@@ -662,7 +662,7 @@ pid_t
 waitpid (pid_t p, int* code) {
     pmmsg_t msg;
     msg.cmd = PM_WAIT;
-	msg.wait.ask.pid = p;
+    msg.wait.ask.pid = p;
     sendrec(pmtask, &msg, sizeof(msg));
     if (code) {
         *code = msg.wait.ans.code;

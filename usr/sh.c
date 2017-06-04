@@ -166,12 +166,12 @@ builtin (char* cmd) {
 
 static int
 launch_job (char** argv) {
-	char *cmd = (char*) pmmalloc(MAX_JOBLEN);
+    char *cmd = (char*) pmmalloc(MAX_JOBLEN);
     ASSERT(cmd);
     receive(TASK_ANY, cmd, MAX_JOBLEN);
     send(spawntask(exec_job, DEFAULT_STACK_SIZE + 64, argv), cmd);
-	pmfree(cmd);
-	return (0);
+    pmfree(cmd);
+    return (0);
 }
 
 
@@ -186,9 +186,9 @@ execute (char interactive, char direct, char* line, char** argv) {
     }
     job = (char*) pmmalloc(MAX_JOBLEN); /* buffer for one cmd */
     ASSERT(job);
-    strcpy(job, line);					/* filling with one section */
+    strcpy(job, line);          /* filling with one section */
     send(spawntask(direct ? exec_job: launch_job, DEFAULT_STACK_SIZE+64, argv), job);
-    pmfree(job);							/* deleting buffer */
+    pmfree(job);                /* deleting buffer */
     wait(&code);
     if (direct && interactive) {
         mfprintf(STDERR, " (%d)\n", code);
@@ -206,15 +206,15 @@ getcmd (int fin, char* cmd, int len) {
     while (1) {
         c = readc(fin);
         if (c == EOF) {
-			return c;
-		}
+            return c;
+        }
         if (i >= (len-1)) {
-			i--;
-		}
+            i--;
+        }
         if ((c == '\r') || (c == '\n')) {
-			break;
-		}
-        cmd[i++] = c;  
+            break;
+        }
+        cmd[i++] = c;
         i -= (i == len-1) ? 1 : 0;
     }
     cmd[i] = '\0';
@@ -249,7 +249,7 @@ getcmd (int fin, char* cmd, int len) {
     close(5);                           \
     close(STDOUT);                      \
     dup(4);                             \
-    
+
 
 
 /**
@@ -260,9 +260,9 @@ sh (char** argv) {
     int code;
     int pip[2];
     int nextin;
-	char *cmdline, *p, *jobstart;
+    char *cmdline, *p, *jobstart;
     int fin = STDIN;
-    
+
     nextin = dup(STDIN);    /* 3 = stdin  */
     dup(STDOUT);            /* 4 = stdout */
     JOB_INIT
@@ -281,20 +281,20 @@ sh (char** argv) {
         if (fin == 0) { /* interactive */
             mfprintf(STDOUT, "$ "); /* prompt */
         }
-		cmdline = (char*) pmmalloc(MAX_CMDLINE);
+        cmdline = (char*) pmmalloc(MAX_CMDLINE);
         ASSERT(cmdline);
         if (getcmd(fin, cmdline, MAX_CMDLINE) == EOF) {
             if (fin == 0) {
                 mfprintf(STDERR, "\nExit\n");
             }
-			mexit(0);
+            mexit(0);
         }
-        
-		p = cmdline;
-		jobstart = cmdline;
-		/* Go through command line until term null */
-		while (*p) {			
-			switch (*p) {
+
+        p = cmdline;
+        jobstart = cmdline;
+        /* Go through command line until term null */
+        while (*p) {
+            switch (*p) {
               case '\\': /* ignore next char */
                 memmove(p, p+1, strlen(p)+1); /* move string left by one */
                 break;
@@ -303,28 +303,28 @@ sh (char** argv) {
                 continue;
               case '|': /* pipe for future */
                 JOB_PIPE
-                *p++ = '\0'; 
+                *p++ = '\0';
                 execute((fin == STDIN), 0, jobstart, argv);
                 jobstart = p; /**/
                 continue; /* pointer has been increased already */
               case '&': /* job section boundary */
                 JOB_NOPIPE
-                *p++ = '\0'; 
+                *p++ = '\0';
                 execute((fin == STDIN), 0, jobstart, argv);
                 jobstart = p; /**/
                 JOB_INIT
                 continue; /* pointer has been increased already */
               case ';': /* command sequence boundary */
                 JOB_NOPIPE
-                *p++ = '\0'; 
+                *p++ = '\0';
                 code = execute((fin == STDIN), 1, jobstart, argv);
                 jobstart = p; /**/
                 JOB_INIT
                 continue; /* pointer has been increased already */
-			}
-			p++;
-		}		
-		/* launching last job directly and waiting for it */
+            }
+            p++;
+        }
+        /* launching last job directly and waiting for it */
         JOB_NOPIPE
         code = execute((fin == STDIN), 1, jobstart, argv);
         code = code;

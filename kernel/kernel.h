@@ -12,7 +12,7 @@ enum {
     TASK_PRIO_HIGH,
     TASK_PRIO_DFLT,
     TASK_PRIO_LOW,
-	TASK_PRIO_IDLE,
+    TASK_PRIO_IDLE,
 
     TASK_PRIO_QUEUE_MAX   /* Must be the last regardless of the number of prios */
 };

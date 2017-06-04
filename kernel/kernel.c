@@ -23,7 +23,7 @@ unsigned int                eventcode;     /* kernel event code */
  * TASK
  */
 
-typedef struct task_s {     /* 22 byte */
+typedef struct task_s {     /* 11 bytes */
     QUEUE_HEADER            /* 4 byte */
     char*           sp;            /* stack pointer */
     char*           sb;            /* stack bottom */
@@ -244,7 +244,7 @@ managesend (q_head_t* que UNUSED, q_item_t* ptsk) {
         return (NULL);
     }
     memcpy((void*)GETP1(p_ctxt),
-		   (void*)GETP1(c_ctxt),
+           (void*)GETP1(c_ctxt),
            (size_t)GETP2(p_ctxt));
     SETP0(p_ctxt, CURRENT);
     return (ptsk); // Waiting task will continue running
@@ -354,10 +354,10 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
         switch_from_kernel();
 
         /* kernel entry point */
-		old = CURRENT;
+        old = CURRENT;
         ctxt = GET_CTXT(CURRENT);
 
-		/* handle event */
+        /* handle event */
         if (eventcode != EVENT_NONE) {
             /* Check whether any task waits for this event */
             wtask = (pid_t) q_forall(&blocked_q, dispatchevent);
@@ -373,26 +373,26 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
                 SETP0(GET_CTXT((task_t*)wtask), eventcode);
             }
             eventcode = EVENT_NONE;
-			continue;
-		}
+            continue;
+        }
 
         /* handle kernel call*/
         switch (GET_KCALLCODE(ctxt)) {
 
-		  case KRNL_CREATETASK:  /* Add a new task entry in the blocked queue */
-			wtask = (pid_t) Q_FRONT(&blocked_q, newtask());
-			if (wtask) {
+          case KRNL_CREATETASK:  /* Add a new task entry in the blocked queue */
+            wtask = (pid_t) Q_FRONT(&blocked_q, newtask());
+            if (wtask) {
                 wtask->prio = (unsigned char)GETP0(ctxt);
                 wtask->page = (char)GETP1(ctxt);
-				wtask->sb = NULL;
-			}
-			SETP0(ctxt, wtask);
-			break;
+                wtask->sb = NULL;
+            }
+            SETP0(ctxt, wtask);
+            break;
 
-		  case KRNL_ALLOCATESTACK:    /* Create new stack frame */
+          case KRNL_ALLOCATESTACK:    /* Create new stack frame */
             /* cpu_context + exit fn */
             SETP0(ctxt, do_allocatestack((task_t*)GETP0(ctxt), (size_t)GETP1(ctxt)));
-			break;
+            break;
 
           case KRNL_GETSTACK:
             break;
@@ -400,86 +400,86 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             break;
 
           case KRNL_SETUPTASK:
-			do_setuptask((task_t*)GETP0(ctxt),
+            do_setuptask((task_t*)GETP0(ctxt),
                          (void (*)(void*))GETP1(ctxt),
                          (void*)GETP2(ctxt),
                          (void (*)(void))GETP3(ctxt));
-			break;
+            break;
 
-		  case KRNL_STARTTASK:      /* Start a task */
-			wtask = (pid_t)GETP0(ctxt);
+          case KRNL_STARTTASK:      /* Start a task */
+            wtask = (pid_t)GETP0(ctxt);
              /* put new task at the end of rdy queue */
             Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             //Q_FRONT(&queue[old->prio], Q_REMV(&current_q, CURRENT));
-			break;
+            break;
 
-		  case KRNL_STOPTASK:       /* Delete the stack of a blocked task */
-			wtask = (pid_t)GETP0(ctxt);
-			if (wtask->sb) {
-				free(wtask->sb);
+          case KRNL_STOPTASK:       /* Delete the stack of a blocked task */
+            wtask = (pid_t)GETP0(ctxt);
+            if (wtask->sb) {
+                free(wtask->sb);
                 wtask->sb = NULL;
-			}
-			break;
+            }
+            break;
 
-		  case KRNL_DELETETASK:     /* Delete a blocked task */
-			free((void*)Q_REMV(&blocked_q, (pid_t)GETP0(ctxt)));
-			break;
+          case KRNL_DELETETASK:     /* Delete a blocked task */
+            free((void*)Q_REMV(&blocked_q, (pid_t)GETP0(ctxt)));
+            break;
 
-		  case KRNL_EXITTASK:       /* Current task exits */
-			free(CURRENT->sb);
-			free(Q_REMV(&current_q, CURRENT));
-			break;
+          case KRNL_EXITTASK:       /* Current task exits */
+            free(CURRENT->sb);
+            free(Q_REMV(&current_q, CURRENT));
+            break;
 
-		  case KRNL_IRQEN:          /* Enable interrupts */
-			CURRENT->flags &= ~(TASK_FLAG_IRQDIS);
-			break;
+          case KRNL_IRQEN:          /* Enable interrupts */
+            CURRENT->flags &= ~(TASK_FLAG_IRQDIS);
+            break;
 
-		  case KRNL_IRQDIS:         /* Disable interrupts */
-			CURRENT->flags |= (TASK_FLAG_IRQDIS);
-			break;
+          case KRNL_IRQDIS:         /* Disable interrupts */
+            CURRENT->flags |= (TASK_FLAG_IRQDIS);
+            break;
 
-		  case KRNL_WAITEVENT:      /* Block task until an event occurs */
+          case KRNL_WAITEVENT:      /* Block task until an event occurs */
             Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
-			break;
+            break;
 
-		  case KRNL_MALLOC:         /* Allocate memory */
+          case KRNL_MALLOC:         /* Allocate memory */
             SETP0(ctxt, malloc((size_t)GETP0(ctxt)));
-			break;
+            break;
 
-		  case KRNL_FREE:           /* Free memory */
-			free((void*)GETP0(ctxt));
-			break;
+          case KRNL_FREE:           /* Free memory */
+            free((void*)GETP0(ctxt));
+            break;
 
           case KRNL_GETPID:         /* Get pid */
             SETP0(ctxt, CURRENT);
-			break;
+            break;
 
-		  case KRNL_SEND:           /* Send a message */
-			wtask = (task_t*) q_forall(&blocked_q, managesend);
-			if (!wtask) {
+          case KRNL_SEND:           /* Send a message */
+            wtask = (task_t*) q_forall(&blocked_q, managesend);
+            if (!wtask) {
                 /* cannot deliver, block sending task */
                 Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
-			} else {
+            } else {
                 Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             }
-			break;
+            break;
 
-		  case KRNL_SENDREC:        /* Send a message, then receive */
-			wtask = (task_t*) q_forall(&blocked_q, managesend);
-			if (wtask) {
+          case KRNL_SENDREC:        /* Send a message, then receive */
+            wtask = (task_t*) q_forall(&blocked_q, managesend);
+            if (wtask) {
                 /* msg delivered, put CURRENT in RCV state */
                 SET_KCALLCODE(ctxt, KRNL_RECEIVE);
                 Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             }
             Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
-			break;
+            break;
 
-		  case KRNL_RECEIVE:        /* Receive a message */
-			wtask = (task_t*) q_forall(&blocked_q, managereceive);
-			if (!wtask) {
+          case KRNL_RECEIVE:        /* Receive a message */
+            wtask = (task_t*) q_forall(&blocked_q, managereceive);
+            if (!wtask) {
                 /* no sender, block receiving task */
-				Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
-			} else {
+                Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
+            } else {
                 if (GET_KCALLCODE(GET_CTXT(wtask)) == KRNL_SENDREC) {
                     /* msg received, put sender in RCV state */
                     SET_KCALLCODE(GET_CTXT(wtask), KRNL_RECEIVE);
@@ -487,15 +487,15 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
                     Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
                 }
             }
-			break;
+            break;
 
-		  case KRNL_YIELD:          /* Let other tasks running */
+          case KRNL_YIELD:          /* Let other tasks running */
             Q_END(&queue[old->prio], Q_REMV(&current_q, CURRENT));
             break;
 
-		  default:
-			break;
-		}
+          default:
+            break;
+        }
     }
     return;
 }
