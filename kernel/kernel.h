@@ -4,9 +4,7 @@
 #include <stdlib.h>  // malloc, free
 #include <stdint.h>  // uint types
 #include <string.h>  // memset
-
-
-#define UNUSED      __attribute__ ((unused))
+#include "../lib/commondef.h"
 
 
 enum {
@@ -73,7 +71,7 @@ void* kmalloc (size_t size);
 void kfree (void* ptr);
 
 
-pid_t cratetask(unsigned char prio, char page);
+pid_t createtask(unsigned char prio, char page);
 
 char* allocatestack(pid_t pid, size_t size);
 
@@ -91,8 +89,7 @@ void kirqen(void);
 
 void kirqdis(void);
 
-char ktest (char v);
-char ktest2 (char a, int b, int c, char d);
+int ktest (char a, int b, int c, char d);
 
 
 /*

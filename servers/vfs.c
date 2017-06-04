@@ -135,7 +135,7 @@ do_mkdev (vfsmsg_t *msg) {
         msg->mkdev.ans.id = -1;
         return;
     }
-    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE);
     setuptask(pid, msg->mkdev.ask.driver, msg->mkdev.ask.args, NULL);
     starttask(pid);
@@ -599,7 +599,7 @@ readc (int fd) {
  */
 
 pid_t
-vfs_cratetask (pid_t pid, pid_t parent) {
+vfs_createtask (pid_t pid, pid_t parent) {
     vfsmsg_t msg;
     msg.cmd = VFS_ADDTASK;
     msg.adddel.pid = pid;

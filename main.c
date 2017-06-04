@@ -22,14 +22,14 @@ startup (void* args UNUSED) {
     char** initc;
 
     /* starting time server */
-    pid = cratetask(TASK_PRIO_RT, PAGE_INVALID);
+    pid = createtask(TASK_PRIO_RT, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE);
     setuptask(pid, ts, NULL, NULL);
     starttask(pid);
     settspid(pid);
 
     /* starting virtual filesystem server */
-    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE * 2);
     setuptask(pid, vfs, NULL, NULL);
     starttask(pid);
@@ -41,7 +41,7 @@ startup (void* args UNUSED) {
     mkdev(memfile, NULL);
 
     /* starting executable store server */
-    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE);
     setuptask(pid, es, NULL, NULL);
     starttask(pid);
@@ -67,7 +67,7 @@ startup (void* args UNUSED) {
     initc = (char**)kmalloc(sizeof(char*[2])); /* Freed in PM */
     initc[0] = "init";
     initc[1] = NULL;
-    pid = cratetask(TASK_PRIO_HIGH, PAGE_INVALID);
+    pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE * 2);
     setuptask(pid, pm, initc, NULL);
     starttask(pid);

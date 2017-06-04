@@ -374,7 +374,7 @@ do_spawn (pmmsg_t* msg) {
     pid_t       task;
     pm_task_t*  pm_task;
 
-    task = cratetask(TASK_PRIO_DFLT, PAGE_INVALID);
+    task = createtask(TASK_PRIO_DFLT, PAGE_INVALID);
     if (!task) {
         return;   /* Sorry... */
     }
@@ -382,7 +382,7 @@ do_spawn (pmmsg_t* msg) {
     if (!Q_END(&task_q, pm_task)) {
         return;   /* Sorry... */
     }
-    if (!vfs_cratetask(task, PM_PIDOF(PM_CLIENT))){
+    if (!vfs_createtask(task, PM_PIDOF(PM_CLIENT))){
         return;   /* Sorry... */
     }
     if (!pm_setuptask(pm_task, msg->spawn.ask.stack,
@@ -426,7 +426,7 @@ do_spawnexec (pmmsg_t* msg) {
     int(*ptr)(char**);
     size_t stacksize;
 
-    task = cratetask(TASK_PRIO_DFLT, PAGE_INVALID);
+    task = createtask(TASK_PRIO_DFLT, PAGE_INVALID);
     if (!task) {
         return;   /* Sorry... */
     }
@@ -434,7 +434,7 @@ do_spawnexec (pmmsg_t* msg) {
     if (!Q_END(&task_q, pm_task)) {
         return;   /* Sorry... */
     }
-    if (!vfs_cratetask(task, PM_PIDOF(PM_CLIENT))) {
+    if (!vfs_createtask(task, PM_PIDOF(PM_CLIENT))) {
         return;   /* Sorry... */
     }
     es_getprg(msg->exec.ask.name, &ptr, &stacksize);

@@ -165,7 +165,7 @@ void tty_usart0 (void* args UNUSED) {
 
           case VFS_MKDEV: {
                 pid_t       task;
-                task = cratetask(TASK_PRIO_RT, PAGE_INVALID);
+                task = createtask(TASK_PRIO_RT, PAGE_INVALID);
                 allocatestack(task, DEFAULT_STACK_SIZE-64);
                 setuptask(task, usart0_event, NULL, NULL);
                 starttask(task);
@@ -209,18 +209,18 @@ void tty_usart0 (void* args UNUSED) {
                   case 0x08:        /* Backspace */
                     if (idx) {
                         idx--;
-                        usart0_print_char(&wr_q, msg.interrupt.data);
+//                        usart0_print_char(&wr_q, msg.interrupt.data);
                     }
                     break;
                   case '\r':        /* NewLine */
-                    break;
+//                    break;
                   case '\n':        /* NewLine */
-                    usart0_print_char(&wr_q, msg.interrupt.data);
+//                    usart0_print_char(&wr_q, msg.interrupt.data);
                     tbuf[idx++] = msg.interrupt.data;
                     tty_flush(client, &rd_q, tbuf, &idx);
                     break;
                   default:
-                    usart0_print_char(&wr_q, msg.interrupt.data);
+//                    usart0_print_char(&wr_q, msg.interrupt.data);
                     tbuf[idx++] = msg.interrupt.data;
                     break;
                 }

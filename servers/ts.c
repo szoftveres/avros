@@ -128,7 +128,7 @@ ts (void* args UNUSED) {
     ticks = 0;
     q_init(&ts_wait_q);
 
-    client = cratetask(TASK_PRIO_RT, PAGE_INVALID);
+    client = createtask(TASK_PRIO_RT, PAGE_INVALID);
     allocatestack(client, DEFAULT_STACK_SIZE - 64);
     setuptask(client, tickd, NULL, NULL);
     starttask(client);

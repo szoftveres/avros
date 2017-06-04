@@ -1,14 +1,14 @@
 #ifndef _HAL_H_
 #define _HAL_H_
 
+#include "../lib/commondef.h"
 
-#define LOW(val) ((int)(val) & 0xFF)
 
-#define HIGH(val) (((int)(val) >> 8) & 0xFF)
 
-/*
- *
- */
+void swtrap (void ) __attribute__ ((naked));
+
+void cpu_sleep (void);
+
 
 typedef struct cpu_context_s {
 
@@ -50,13 +50,7 @@ typedef struct cpu_context_s {
     unsigned char   retLow;
 } cpu_context_t;
 
-/*
- *
- */
 
-/*
- *
- */
 
 #define SAVE_CONTEXT()                          \
     asm volatile (  "\n\t                   "   \
@@ -96,9 +90,6 @@ typedef struct cpu_context_s {
                     "push r0            \n\t"   \
     );
 
-/*
- *
- */
 
 #define RESTORE_CONTEXT()                       \
     asm volatile (  "\n\t                   "   \
@@ -144,9 +135,9 @@ typedef struct cpu_context_s {
 
 #define LOCK()   asm("cli\n\t"::)
 
-#define UNLOCK()  asm("sei\n\t"::) 
-    
-#define RETURN() asm("ret\n\t"::)     
+#define UNLOCK()  asm("sei\n\t"::)
+
+#define RETURN() asm("ret\n\t"::)
 
 #define RETI() asm("reti\n\t"::)
 
@@ -169,8 +160,9 @@ typedef struct cpu_context_s {
 
 #define SETP0(ctxt, v)                                                  \
     do {                                                                \
-        (ctxt)->r25 = HIGH(v);                                          \
-        (ctxt)->r24 = LOW(v);                                           \
+        unsigned int v_cp = (unsigned int) (v);                         \
+        (ctxt)->r25 = HIGH(v_cp);                                       \
+        (ctxt)->r24 = LOW(v_cp);                                        \
     } while (0)                                                         \
 
 
@@ -179,8 +171,9 @@ typedef struct cpu_context_s {
 
 #define SETP1(ctxt, v)                                                  \
     do {                                                                \
-        (ctxt)->r23 = HIGH(v);                                          \
-        (ctxt)->r22 = LOW(v);                                           \
+        unsigned int v_cp = (unsigned int) (v);                         \
+        (ctxt)->r23 = HIGH(v_cp);                                       \
+        (ctxt)->r22 = LOW(v_cp);                                        \
     } while (0)                                                         \
 
 
@@ -189,8 +182,9 @@ typedef struct cpu_context_s {
 
 #define SETP2(ctxt, v)                                                  \
     do {                                                                \
-        (ctxt)->r21 = HIGH(v);                                          \
-        (ctxt)->r20 = LOW(v);                                           \
+        unsigned int v_cp = (unsigned int) (v);                         \
+        (ctxt)->r21 = HIGH(v_cp);                                       \
+        (ctxt)->r20 = LOW(v_cp);                                        \
     } while (0)                                                         \
 
 
@@ -199,36 +193,25 @@ typedef struct cpu_context_s {
 
 #define SETP3(ctxt, v)                                                  \
     do {                                                                \
-        (ctxt)->r19 = HIGH(v);                                          \
-        (ctxt)->r18 = LOW(v);                                           \
+        unsigned int v_cp = (unsigned int) (v);                         \
+        (ctxt)->r19 = HIGH(v_cp);                                       \
+        (ctxt)->r18 = LOW(v_cp);                                        \
     } while (0)                                                         \
 
 
-#define GETP4(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r17) << 8) | (unsigned int)(ctxt)->r16)    \
 
-#define SETP4(ctxt, v)                                                  \
+#define GET_CTXT(task) (cpu_context_t*)(((task)->sp) + 1)
+
+#define KERNEL_CALL(c)                                                  \
     do {                                                                \
-        (ctxt)->r17 = HIGH(v);                                          \
-        (ctxt)->r16 = LOW(v);                                           \
-    } while (0)                                                         \
+        asm volatile("push  r16\n\t"::);                                \
+        asm volatile("ldi  r16, " STRINGIFY(c) "\n\t"::);               \
+        swtrap();                                                       \
+        asm volatile("pop  r16\n\t"::);                                 \
+    } while (0)
 
+#define SET_KCALLCODE(ctxt, c)     (ctxt)->r16 = (c)
+#define GET_KCALLCODE(ctxt)     ((ctxt)->r16)
 
-#define GETP5(ctxt)                                                     \
-    ((((unsigned int)(ctxt)->r15) << 8) | (unsigned int)(ctxt)->r14)    \
-
-#define SETP5(ctxt, v)                                                  \
-    do {                                                                \
-        (ctxt)->r15 = HIGH(v);                                          \
-        (ctxt)->r14 = LOW(v);                                           \
-    } while (0)                                                         \
-
-
-
-
-void swtrap (void ) __attribute__ ((naked));
-
-
-void cpu_sleep (void);
 
 #endif
