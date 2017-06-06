@@ -48,13 +48,11 @@ typedef struct task_s {     /* 11 bytes */
 
 #define KRNL_CREATETASK     0x20
 #define KRNL_ALLOCATESTACK  0x21
-#define KRNL_GETSTACK       0x22
-#define KRNL_SETSTACK       0x23
-#define KRNL_SETUPTASK      0x24
-#define KRNL_STARTTASK      0x25
-#define KRNL_STOPTASK       0x26
-#define KRNL_DELETETASK     0x27
-#define KRNL_EXITTASK       0x28
+#define KRNL_SETUPTASK      0x22
+#define KRNL_STARTTASK      0x23
+#define KRNL_STOPTASK       0x24
+#define KRNL_DELETETASK     0x25
+#define KRNL_EXITTASK       0x26
 
 #define KRNL_MALLOC         0x30
 #define KRNL_FREE           0x31
@@ -184,7 +182,10 @@ do_setstack (task_t* task, char* ptr, size_t size) {
  * Push CPU context for a task
  */
 static void
-do_setuptask (task_t* task, void (*tp)(void* args), void* args, void (*exitfn)(void)) {
+do_setuptask (task_t* task,
+              void (*tp)(void* args),
+              void* args,
+              void (*exitfn)(void)) {
 
     cpu_context_t* ctxt;
 
@@ -225,57 +226,52 @@ dispatchevent (q_head_t* que UNUSED, q_item_t* ptsk) {
 }
 
 /*
- * Send message
+ * Message processing and delivery
  */
 
-static q_item_t*
-managesend (q_head_t* que UNUSED, q_item_t* ptsk) {
-    cpu_context_t *c_ctxt = GET_CTXT((task_t*)CURRENT);
-    cpu_context_t *p_ctxt = GET_CTXT((task_t*)ptsk);
+static int
+delivermsg (task_t* rcvr_task, task_t* sndr_task) {
+    cpu_context_t *rcvr_ctxt = GET_CTXT(rcvr_task);
+    cpu_context_t *sndr_ctxt = GET_CTXT(sndr_task);
 
-    if (GET_KCALLCODE(p_ctxt) != KRNL_RECEIVE) {
-        return (NULL);
+    /* Check if rcvr is waiting for any msg */
+    if (GET_KCALLCODE(rcvr_ctxt) != KRNL_RECEIVE) {
+        return (0);
     }
-    if ((task_t*)GETP0(c_ctxt) != ((task_t*)ptsk)) {
-        return (NULL);
+    /* Check if this is the rcvr we would like to deliver the msg to */
+    if ((task_t*)GETP0(sndr_ctxt) != ((task_t*)rcvr_task)) {
+        return (0);
     }
-    if (((task_t*)GETP0(p_ctxt) != CURRENT) &&
-        ((task_t*)GETP0(p_ctxt) != TASK_ANY)) {
-        return (NULL);
+    /* Check if rcvr is waiting for a msg from us (or from anyone) */
+    if (((task_t*)GETP0(rcvr_ctxt) != sndr_task) &&
+        ((task_t*)GETP0(rcvr_ctxt) != TASK_ANY)) {
+        return (0);
     }
-    memcpy((void*)GETP1(p_ctxt),
-           (void*)GETP1(c_ctxt),
-           (size_t)GETP2(p_ctxt));
-    SETP0(p_ctxt, CURRENT);
-    return (ptsk); // Waiting task will continue running
+    memcpy((void*)GETP1(rcvr_ctxt),
+           (void*)GETP1(sndr_ctxt),
+           (size_t)GETP2(rcvr_ctxt));
+    /* Success, copy the sender's pid to the rcvr */
+    SETP0(rcvr_ctxt, CURRENT);
+    return (1);
+
 }
 
-/*
- * Receive message
- */
 
 static q_item_t*
-managereceive (q_head_t* que UNUSED, q_item_t* ptsk) {
-    cpu_context_t *c_ctxt = GET_CTXT((task_t*)CURRENT);
-    cpu_context_t *p_ctxt = GET_CTXT((task_t*)ptsk);
+sendmsg (q_head_t* que UNUSED, q_item_t* ptsk) {
+    if (delivermsg((task_t*)ptsk, CURRENT)) {
+        return (ptsk);
+    }
+    return (NULL);
+}
 
-    if (GET_KCALLCODE(p_ctxt) != KRNL_SEND
-            && GET_KCALLCODE(p_ctxt) != KRNL_SENDREC) {
-        return (NULL);
+
+static q_item_t*
+receivemsg (q_head_t* que UNUSED, q_item_t* ptsk) {
+    if (delivermsg(CURRENT, (task_t*)ptsk)) {
+        return (ptsk);
     }
-    if ((task_t*)GETP0(p_ctxt) != CURRENT){
-        return (NULL);
-    }
-    if (((task_t*)GETP0(c_ctxt) != ((task_t*)ptsk)) &&
-        ((task_t*)GETP0(c_ctxt) != TASK_ANY)) {
-        return (NULL);
-    }
-    /* copy the message */
-    memcpy((void*)GETP1(c_ctxt),
-           (void*)GETP1(p_ctxt),
-           (size_t)GETP2(c_ctxt));
-    SETP0(c_ctxt, ptsk);
-    return (ptsk);
+    return (NULL);
 }
 
 /*
@@ -390,13 +386,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             break;
 
           case KRNL_ALLOCATESTACK:    /* Create new stack frame */
-            /* cpu_context + exit fn */
             SETP0(ctxt, do_allocatestack((task_t*)GETP0(ctxt), (size_t)GETP1(ctxt)));
-            break;
-
-          case KRNL_GETSTACK:
-            break;
-          case KRNL_SETSTACK:
             break;
 
           case KRNL_SETUPTASK:
@@ -455,7 +445,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             break;
 
           case KRNL_SEND:           /* Send a message */
-            wtask = (task_t*) q_forall(&blocked_q, managesend);
+            wtask = (task_t*) q_forall(&blocked_q, sendmsg);
             if (!wtask) {
                 /* cannot deliver, block sending task */
                 Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
@@ -465,7 +455,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             break;
 
           case KRNL_SENDREC:        /* Send a message, then receive */
-            wtask = (task_t*) q_forall(&blocked_q, managesend);
+            wtask = (task_t*) q_forall(&blocked_q, sendmsg);
             if (wtask) {
                 /* msg delivered, put CURRENT in RCV state */
                 SET_KCALLCODE(ctxt, KRNL_RECEIVE);
@@ -475,7 +465,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             break;
 
           case KRNL_RECEIVE:        /* Receive a message */
-            wtask = (task_t*) q_forall(&blocked_q, managereceive);
+            wtask = (task_t*) q_forall(&blocked_q, receivemsg);
             if (!wtask) {
                 /* no sender, block receiving task */
                 Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
