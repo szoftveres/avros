@@ -251,9 +251,8 @@ delivermsg (task_t* rcvr_task, task_t* sndr_task) {
            (void*)GETP1(sndr_ctxt),
            (size_t)GETP2(rcvr_ctxt));
     /* Success, copy the sender's pid to the rcvr */
-    SETP0(rcvr_ctxt, CURRENT);
+    SETP0(rcvr_ctxt, sndr_task);
     return (1);
-
 }
 
 
