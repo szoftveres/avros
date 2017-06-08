@@ -209,7 +209,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     ino = msg->mknod.ino;
 
     /* Get this new node  2x */
-    msg->cmd = VFS_IGET;
+    msg->cmd = VFS_INODE_GRAB;
     msg->iget.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
 
@@ -218,7 +218,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
         return; /* Cannot get node */
     }
 
-    msg->cmd = VFS_IGET;
+    msg->cmd = VFS_INODE_GRAB;
     msg->iget.ino = ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
 
@@ -290,7 +290,7 @@ do_open (vfs_task_t *client, vfsmsg_t *msg) {
     filp[fp].pos = 0;
 
     /* Get the node */
-    msg->cmd = VFS_IGET;
+    msg->cmd = VFS_INODE_GRAB;
     msg->iget.ino = filp[fp].ino;
     sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
 
@@ -331,7 +331,7 @@ do_close (vfs_task_t *client, vfsmsg_t *msg) {
     }
 
     /* No more refs, close this node */
-    msg->cmd = VFS_IPUT;
+    msg->cmd = VFS_INODE_RELEASE;
     msg->iget.ino = filp[fp].ino;
     sendrec(devtab[filp[fp].dev], msg, sizeof(vfsmsg_t));
 

@@ -234,19 +234,22 @@ delivermsg (task_t* rcvr_task, task_t* sndr_task) {
     cpu_context_t *rcvr_ctxt = GET_CTXT(rcvr_task);
     cpu_context_t *sndr_ctxt = GET_CTXT(sndr_task);
 
-    /* Check if rcvr is waiting for any msg */
+    /* Check if rendez-vous criteria is satisfied */
+    if ((GET_KCALLCODE(sndr_ctxt) != KRNL_SEND) &&
+        (GET_KCALLCODE(sndr_ctxt) != KRNL_SENDREC)) {
+        return (0);
+    }
     if (GET_KCALLCODE(rcvr_ctxt) != KRNL_RECEIVE) {
         return (0);
     }
-    /* Check if this is the rcvr we would like to deliver the msg to */
-    if ((task_t*)GETP0(sndr_ctxt) != ((task_t*)rcvr_task)) {
+    if ((task_t*)GETP0(sndr_ctxt) != rcvr_task) {
         return (0);
     }
-    /* Check if rcvr is waiting for a msg from us (or from anyone) */
     if (((task_t*)GETP0(rcvr_ctxt) != sndr_task) &&
         ((task_t*)GETP0(rcvr_ctxt) != TASK_ANY)) {
         return (0);
     }
+    /* Copy the msg */
     memcpy((void*)GETP1(rcvr_ctxt),
            (void*)GETP1(sndr_ctxt),
            (size_t)GETP2(rcvr_ctxt));

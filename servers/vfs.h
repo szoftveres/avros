@@ -14,8 +14,8 @@ enum {
     VFS_RX_INTERRUPT,
     VFS_TX_INTERRUPT,
 
-    VFS_IGET,
-    VFS_IPUT,
+    VFS_INODE_GRAB,
+    VFS_INODE_RELEASE,
     VFS_LINK,
     VFS_UNLINK,
 

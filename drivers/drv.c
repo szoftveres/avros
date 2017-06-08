@@ -174,9 +174,9 @@ void tty_usart0 (void* args UNUSED) {
             }
             break;
 
-          case VFS_IGET:
+          case VFS_INODE_GRAB:
             break;
-          case VFS_IPUT:
+          case VFS_INODE_RELEASE:
             break;
           case VFS_LINK:
             break;
@@ -300,14 +300,14 @@ void memfile (void* args UNUSED) {
             nodes[msg.link.ino] = NULL;
             break;
 
-          case VFS_IGET:
+          case VFS_INODE_GRAB:
             if (!nodes[msg.iget.ino]) {
                 msg.iget.ino = -1;
                 break;
             }
             nodes[msg.iget.ino]->refcnt += 1;
             break;
-          case VFS_IPUT:
+          case VFS_INODE_RELEASE:
             if (!nodes[msg.iget.ino]) {
                 msg.iget.ino = -1;
                 break;
@@ -415,14 +415,14 @@ void pipedev (void* args UNUSED) {
             nodes[msg.link.ino] = NULL;
             break;
 
-          case VFS_IGET:
+          case VFS_INODE_GRAB:
             if (!nodes[msg.iget.ino]) {
                 msg.iget.ino = -1;
                 break;
             }
             nodes[msg.iget.ino]->refcnt += 1;
             break;
-          case VFS_IPUT:
+          case VFS_INODE_RELEASE:
             if (!nodes[msg.iget.ino]) {
                 msg.iget.ino = -1;
                 break;
