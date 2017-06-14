@@ -9,7 +9,7 @@
  * kernel globals
  */
 
-static pid_t                kerneltask;
+static char*                kernel_sp;      /* Kernel SP */
 
 static q_head_t             queue[TASK_PRIO_QUEUE_MAX];
 static q_head_t             current_q;
@@ -40,28 +40,28 @@ typedef struct task_s {     /* 11 bytes */
  * kernel call codes
  */
 
-#define KRNL_YIELD          0x00
-#define KRNL_GETPID         0x01
+#define KCALL_YIELD             0x00
+#define KCALL_GETPID            0x01
 
-#define KRNL_IRQEN          0x10
-#define KRNL_IRQDIS         0x11
+#define KCALL_IRQEN             0x10
+#define KCALL_IRQDIS            0x11
 
-#define KRNL_CREATETASK     0x20
-#define KRNL_ALLOCATESTACK  0x21
-#define KRNL_SETUPTASK      0x22
-#define KRNL_STARTTASK      0x23
-#define KRNL_STOPTASK       0x24
-#define KRNL_DELETETASK     0x25
-#define KRNL_EXITTASK       0x26
+#define KCALL_CREATETASK        0x20
+#define KCALL_ALLOCATESTACK     0x21
+#define KCALL_SETUPTASK         0x22
+#define KCALL_STARTTASK         0x23
+#define KCALL_STOPTASK          0x24
+#define KCALL_DELETETASK        0x25
+#define KCALL_EXITTASK          0x26
 
-#define KRNL_MALLOC         0x30
-#define KRNL_FREE           0x31
+#define KCALL_MALLOC            0x30
+#define KCALL_FREE              0x31
 
-#define KRNL_SEND           0x40
-#define KRNL_SENDREC        0x41
-#define KRNL_RECEIVE        0x42
+#define KCALL_SEND              0x40
+#define KCALL_SENDREC           0x41
+#define KCALL_RECEIVE           0x42
 
-#define KRNL_WAITEVENT      0x50
+#define KCALL_WAITEVENT         0x50
 
 
 /*
@@ -75,7 +75,7 @@ void switch_from_kernel (void) __attribute__ ((naked));
 void switchtokernel (void) {
     SAVE_CONTEXT();
     CURRENT->sp = GET_SP();
-    SET_SP(kerneltask->sp);
+    SET_SP(kernel_sp);
     RESTORE_CONTEXT();
     RETURN();
 }
@@ -83,7 +83,7 @@ void switchtokernel (void) {
 
 void switch_from_kernel (void) {
     SAVE_CONTEXT();
-    kerneltask->sp = GET_SP();
+    kernel_sp = GET_SP();
     SET_SP(CURRENT->sp);
     if (CURRENT->flags & TASK_FLAG_IRQDIS) {
         /* Don't turn on interrupts  */
@@ -150,7 +150,6 @@ do_pushstack (task_t* task, char val) {
 
 static char*
 do_allocatestack (task_t* task, size_t size) {
-
     if (!size) {
         return NULL;
     }
@@ -216,7 +215,7 @@ do_setuptask (task_t* task,
 
 static q_item_t*
 dispatchevent (q_head_t* que UNUSED, q_item_t* ptsk) {
-    if (GET_KCALLCODE(GET_CTXT((task_t*)ptsk)) != (KRNL_WAITEVENT)) {
+    if (GET_KCALLCODE(GET_CTXT((task_t*)ptsk)) != (KCALL_WAITEVENT)) {
         return (NULL);
     }
     if (!((GETP0(GET_CTXT((task_t*)ptsk))) & (eventcode))) {
@@ -235,11 +234,11 @@ delivermsg (task_t* rcvr_task, task_t* sndr_task) {
     cpu_context_t *sndr_ctxt = GET_CTXT(sndr_task);
 
     /* Check if rendez-vous criteria is satisfied */
-    if ((GET_KCALLCODE(sndr_ctxt) != KRNL_SEND) &&
-        (GET_KCALLCODE(sndr_ctxt) != KRNL_SENDREC)) {
+    if ((GET_KCALLCODE(sndr_ctxt) != KCALL_SEND) &&
+        (GET_KCALLCODE(sndr_ctxt) != KCALL_SENDREC)) {
         return (0);
     }
-    if (GET_KCALLCODE(rcvr_ctxt) != KRNL_RECEIVE) {
+    if (GET_KCALLCODE(rcvr_ctxt) != KCALL_RECEIVE) {
         return (0);
     }
     if ((task_t*)GETP0(sndr_ctxt) != rcvr_task) {
@@ -297,24 +296,13 @@ scheduler (void) {
 }
 
 /*
- * initialize kernel task data structure
- */
-
-static pid_t
-initkrnl (void) {
-    eventcode = EVENT_NONE;
-    kerneltask = newtask();
-    return (kerneltask);
-}
-
-/*
  * initialize the first user task
  */
 
 static pid_t
 inittask (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
     pid_t task = newtask();
-    if(!task){
+    if (!task) {
         return (NULL);
     }
     if (!do_allocatestack (task, stack)) {
@@ -327,31 +315,26 @@ inittask (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) 
 }
 
 /*
- * Kernel initialization and kernel task loop starts here
- * The parameter function will be created as the first user task
+ * Kernel initialization and main kernel loop
+ * The first user task is creted from the parameter function
  */
-
 void
 kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
-    pid_t       wtask;              /* task we work on */
-    pid_t       old;
-
-    LOCK();
+    LOCK();     /* In theory this is unnecessary */
     init_task_queues();
-
-    if(!initkrnl()){
-        return;
-    }
-
     inittask(idle_task, NULL, 0x80, TASK_PRIO_IDLE);
     inittask(ptp, args, stack, prio);
+    eventcode = EVENT_NONE;
 
     while (1) {
-        cpu_context_t *ctxt;
+        pid_t           wtask;
+        pid_t           old;
+        cpu_context_t   *ctxt;
         scheduler();
         switch_from_kernel();
 
-        /* kernel entry point */
+        /* kernel re-entry point */
+
         old = CURRENT;
         ctxt = GET_CTXT(CURRENT);
 
@@ -377,7 +360,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
         /* handle kernel call*/
         switch (GET_KCALLCODE(ctxt)) {
 
-          case KRNL_CREATETASK:  /* Add a new task entry in the blocked queue */
+          case KCALL_CREATETASK:  /* Add a new task entry in the blocked queue */
             wtask = (pid_t) Q_FRONT(&blocked_q, newtask());
             if (wtask) {
                 wtask->prio = (unsigned char)GETP0(ctxt);
@@ -387,25 +370,25 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             SETP0(ctxt, wtask);
             break;
 
-          case KRNL_ALLOCATESTACK:    /* Create new stack frame */
+          case KCALL_ALLOCATESTACK:    /* Create new stack frame */
             SETP0(ctxt, do_allocatestack((task_t*)GETP0(ctxt), (size_t)GETP1(ctxt)));
             break;
 
-          case KRNL_SETUPTASK:
+          case KCALL_SETUPTASK:
             do_setuptask((task_t*)GETP0(ctxt),
                          (void (*)(void*))GETP1(ctxt),
                          (void*)GETP2(ctxt),
                          (void (*)(void))GETP3(ctxt));
             break;
 
-          case KRNL_STARTTASK:      /* Start a task */
+          case KCALL_STARTTASK:      /* Start a task */
             wtask = (pid_t)GETP0(ctxt);
              /* put new task at the end of rdy queue */
             Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             //Q_FRONT(&queue[old->prio], Q_REMV(&current_q, CURRENT));
             break;
 
-          case KRNL_STOPTASK:       /* Delete the stack of a blocked task */
+          case KCALL_STOPTASK:       /* Delete the stack of a blocked task */
             wtask = (pid_t)GETP0(ctxt);
             if (wtask->sb) {
                 free(wtask->sb);
@@ -413,40 +396,40 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             }
             break;
 
-          case KRNL_DELETETASK:     /* Delete a blocked task */
+          case KCALL_DELETETASK:     /* Delete a blocked task */
             free((void*)Q_REMV(&blocked_q, (pid_t)GETP0(ctxt)));
             break;
 
-          case KRNL_EXITTASK:       /* Current task exits */
+          case KCALL_EXITTASK:       /* Current task exits */
             free(CURRENT->sb);
             free(Q_REMV(&current_q, CURRENT));
             break;
 
-          case KRNL_IRQEN:          /* Enable interrupts */
+          case KCALL_IRQEN:          /* Enable interrupts */
             CURRENT->flags &= ~(TASK_FLAG_IRQDIS);
             break;
 
-          case KRNL_IRQDIS:         /* Disable interrupts */
+          case KCALL_IRQDIS:         /* Disable interrupts */
             CURRENT->flags |= (TASK_FLAG_IRQDIS);
             break;
 
-          case KRNL_WAITEVENT:      /* Block task until an event occurs */
+          case KCALL_WAITEVENT:      /* Block task until an event occurs */
             Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
             break;
 
-          case KRNL_MALLOC:         /* Allocate memory */
+          case KCALL_MALLOC:         /* Allocate memory */
             SETP0(ctxt, malloc((size_t)GETP0(ctxt)));
             break;
 
-          case KRNL_FREE:           /* Free memory */
+          case KCALL_FREE:           /* Free memory */
             free((void*)GETP0(ctxt));
             break;
 
-          case KRNL_GETPID:         /* Get pid */
+          case KCALL_GETPID:         /* Get pid */
             SETP0(ctxt, CURRENT);
             break;
 
-          case KRNL_SEND:           /* Send a message */
+          case KCALL_SEND:           /* Send a message */
             wtask = (task_t*) q_forall(&blocked_q, sendmsg);
             if (!wtask) {
                 /* cannot deliver, block sending task */
@@ -456,32 +439,32 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             }
             break;
 
-          case KRNL_SENDREC:        /* Send a message, then receive */
+          case KCALL_SENDREC:        /* Send a message, then receive */
             wtask = (task_t*) q_forall(&blocked_q, sendmsg);
             if (wtask) {
                 /* msg delivered, put CURRENT in RCV state */
-                SET_KCALLCODE(ctxt, KRNL_RECEIVE);
+                SET_KCALLCODE(ctxt, KCALL_RECEIVE);
                 Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             }
             Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
             break;
 
-          case KRNL_RECEIVE:        /* Receive a message */
+          case KCALL_RECEIVE:        /* Receive a message */
             wtask = (task_t*) q_forall(&blocked_q, receivemsg);
             if (!wtask) {
                 /* no sender, block receiving task */
                 Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
             } else {
-                if (GET_KCALLCODE(GET_CTXT(wtask)) == KRNL_SENDREC) {
+                if (GET_KCALLCODE(GET_CTXT(wtask)) == KCALL_SENDREC) {
                     /* msg received, put sender in RCV state */
-                    SET_KCALLCODE(GET_CTXT(wtask), KRNL_RECEIVE);
+                    SET_KCALLCODE(GET_CTXT(wtask), KCALL_RECEIVE);
                 } else {
                     Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
                 }
             }
             break;
 
-          case KRNL_YIELD:          /* Let other tasks running */
+          case KCALL_YIELD:          /* Let other tasks running */
             Q_END(&queue[old->prio], Q_REMV(&current_q, CURRENT));
             break;
 
@@ -499,14 +482,14 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
 pid_t
 getpid (void) {
     register pid_t ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_GETPID);
+    KERNEL_CALL(KCALL_GETPID);
     return (ret);
 }
 
 
 void
 yield (void) {
-    KERNEL_CALL(KRNL_YIELD);
+    KERNEL_CALL(KCALL_YIELD);
     return;
 }
 
@@ -514,7 +497,7 @@ yield (void) {
 int
 waitevent (int event UNUSED) {
     register int ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_WAITEVENT);
+    KERNEL_CALL(KCALL_WAITEVENT);
     return (ret);
 }
 
@@ -522,14 +505,14 @@ waitevent (int event UNUSED) {
 void*
 kmalloc (size_t size UNUSED) {
     register void* ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_MALLOC);
+    KERNEL_CALL(KCALL_MALLOC);
     return (ret);
 }
 
 
 void
 kfree (void* ptr UNUSED) {
-    KERNEL_CALL(KRNL_FREE);
+    KERNEL_CALL(KCALL_FREE);
     return;
 }
 
@@ -537,7 +520,7 @@ kfree (void* ptr UNUSED) {
 pid_t
 send (pid_t dest UNUSED, void* msg UNUSED) {
     register pid_t ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_SEND);
+    KERNEL_CALL(KCALL_SEND);
     return (ret);
 }
 
@@ -545,7 +528,7 @@ send (pid_t dest UNUSED, void* msg UNUSED) {
 pid_t
 sendrec (pid_t tsk UNUSED, void* msg UNUSED, size_t len UNUSED) {
     register pid_t ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_SENDREC);
+    KERNEL_CALL(KCALL_SENDREC);
     return (ret);
 }
 
@@ -553,7 +536,7 @@ sendrec (pid_t tsk UNUSED, void* msg UNUSED, size_t len UNUSED) {
 pid_t
 receive (pid_t src UNUSED, void* msg UNUSED, size_t len UNUSED) {
     register pid_t ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_RECEIVE);
+    KERNEL_CALL(KCALL_RECEIVE);
     return (ret);
 }
 
@@ -561,7 +544,7 @@ receive (pid_t src UNUSED, void* msg UNUSED, size_t len UNUSED) {
 pid_t
 createtask (unsigned char prio UNUSED, char page UNUSED) {
     register pid_t ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_CREATETASK);
+    KERNEL_CALL(KCALL_CREATETASK);
     return (ret);
 }
 
@@ -569,7 +552,7 @@ createtask (unsigned char prio UNUSED, char page UNUSED) {
 char*
 allocatestack (pid_t pid UNUSED, size_t size UNUSED) {
     register char* ret __asm__ ("r24");
-    KERNEL_CALL(KRNL_ALLOCATESTACK);
+    KERNEL_CALL(KCALL_ALLOCATESTACK);
     return (ret);
 }
 
@@ -580,35 +563,35 @@ setuptask (pid_t pid UNUSED,
            void* args UNUSED,
            void(*exitfn)(void) UNUSED) {
 
-    KERNEL_CALL(KRNL_SETUPTASK);
+    KERNEL_CALL(KCALL_SETUPTASK);
     return;
 }
 
 
 void
 starttask (pid_t pid UNUSED) {
-    KERNEL_CALL(KRNL_STARTTASK);
+    KERNEL_CALL(KCALL_STARTTASK);
     return;
 }
 
 
 void
 stoptask(pid_t pid UNUSED) {
-    KERNEL_CALL(KRNL_STOPTASK);
+    KERNEL_CALL(KCALL_STOPTASK);
     return;
 }
 
 
 void
 deletetask(pid_t pid UNUSED) {
-    KERNEL_CALL(KRNL_DELETETASK);
+    KERNEL_CALL(KCALL_DELETETASK);
     return;
 }
 
 
 void
 exittask(void) {
-    KERNEL_CALL(KRNL_EXITTASK);
+    KERNEL_CALL(KCALL_EXITTASK);
     /* NEVER REACHED */
     return;
 }
@@ -616,14 +599,14 @@ exittask(void) {
 
 void
 kirqen(void) {
-    KERNEL_CALL(KRNL_IRQEN);
+    KERNEL_CALL(KCALL_IRQEN);
     return;
 }
 
 
 void
 kirqdis(void) {
-    KERNEL_CALL(KRNL_IRQDIS);
+    KERNEL_CALL(KCALL_IRQDIS);
     return;
 }
 
