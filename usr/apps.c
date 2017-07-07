@@ -9,9 +9,13 @@
 
 #include "apps.h"
 
+
 /*
-================================================================================
-*/
+ * getty [filename]
+ *
+ * opens [filename] (which should be a terminal device), then runs 'login'
+ * It is normally invoked by 'init'
+ */
 
 int
 getty (char** argv) {
@@ -37,8 +41,12 @@ getty (char** argv) {
 }
 
 /*
-================================================================================
-*/
+ * login
+ *
+ * Waits for an 'Enter' key, then runs shell
+ * No authentication, only for legacy purposes
+ * Normally invoked by 'getty'
+ */
 
 int
 login (char** argv) {
@@ -60,8 +68,10 @@ login (char** argv) {
 }
 
 /*
-================================================================================
-*/
+ * echo
+ *
+ * Prints the arguments on the standard output
+ */
 
 #define ECHO_N    0x01
 
@@ -92,17 +102,16 @@ echo (char** argv) {
 }
 
 /*
-================================================================================
-*/
+ * cat
+ *
+ * concatenate files and print on the standard output
+ */
 
 void
 docat (void) {
     int c;
     while((c = mgetc()) != EOF) {mfputc(1, c);}
 }
-
-/**
-*/
 
 int
 cat (char** argv) {
@@ -122,10 +131,12 @@ cat (char** argv) {
     return (0);
 }
 
-
 /*
-================================================================================
-*/
+ * cap
+ *
+ * concatenate files and print on the standard output
+ * changes lower-case letters to capitals
+ */
 
 void
 docap (void) {
@@ -137,9 +148,6 @@ docap (void) {
         mfputc(1, c);
     }
 }
-
-/**
-*/
 
 int
 cap (char** argv) {
@@ -159,10 +167,11 @@ cap (char** argv) {
     return (0);
 }
 
-
 /*
-================================================================================
-*/
+ * sleep
+ *
+ * delay for a specified amount of time (seconds)
+ */
 
 int
 sleep (char** argv) {
@@ -175,8 +184,10 @@ sleep (char** argv) {
 }
 
 /*
-================================================================================
-*/
+ * xargs
+ *
+ * build and execute command lines from standard input
+ */
 
 int
 xargs (char** argv) {
@@ -229,8 +240,10 @@ xargs (char** argv) {
 }
 
 /*
-================================================================================
-*/
+ * repeat
+ *
+ * repeat a command for a specified times
+ */
 
 int
 do_repeat (char** argv) {
@@ -256,8 +269,10 @@ repeat (char** argv) {
 }
 
 /*
-================================================================================
-*/
+ * uptime
+ *
+ * tell how long the system has been running
+ */
 
 int
 pr_uptime (char** argv UNUSED) {
@@ -284,8 +299,10 @@ pr_uptime (char** argv UNUSED) {
 }
 
 /*
-================================================================================
-*/
+ * stat
+ *
+ * display file information
+ */
 
 int
 f_stat (char** argv) {
@@ -308,9 +325,13 @@ f_stat (char** argv) {
     return (0);
 }
 
+
 /*
-================================================================================
-*/
+ * grep
+ *
+ * print lines matching a pattern
+ */
+
 
 #define GREP_INV    0x01
 
@@ -341,8 +362,6 @@ dogrep (char* regexp, int opt) {
     return (rc);
 }
 
-/**
-*/
 
 int
 grep (char** argv) {
@@ -382,10 +401,10 @@ grep (char** argv) {
 }
 
 /*
-================================================================================
-*/
-
-/*
+ * mknod
+ *
+ * make files on the file system
+ *
  *          [dev num]   0:pipe, 1:usart, 2:memfile
  *
  *  $ mknod 0
@@ -405,3 +424,4 @@ f_mknod (char** argv) {
     mfprintf(1, " %d/%d\n", atoi(argv[1]), inum);
     return (0);
 }
+

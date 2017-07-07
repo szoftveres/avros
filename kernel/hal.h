@@ -46,6 +46,9 @@ typedef struct cpu_context_s {
     unsigned char   rSREG;
     unsigned char   r31;
 
+//    unsigned char   call_code;
+//    unsigned char   evnt_code;
+
     unsigned char   retHigh;
     unsigned char   retLow;
 } cpu_context_t;

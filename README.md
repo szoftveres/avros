@@ -5,14 +5,14 @@ UNIX-like embedded microkernel OS for Atmel AVR CPUs
 Runs on ATmega1284p with 16k RAM
 
 Features:
-- Minimal microkernel with message passing facilities, the OS entity is defined by the servers that communicate with each other via the kernel
-- Multiple OS entities can coexist on the same CPU without interferring with each other
+- Minimal microkernel with message passing facilities, the majority of the OS services ("Process" management, File system, Device drivers) are implemented by separate tasks (servers) that communicate with their clients (user tasks) and with each other by message passing
+- The currently implemented OS entity is UNIX-like, with familiar system calls, the OS entity is mainly defined by the OS service tasks (servers)
+- Multiple OS entities can coexist on the same CPU, sharing the same microkernel
 - Cooperative and/or timer interrupt based preemptive multitasking
 - Virtual file system with UNIX-pipes - (filenames and folders are not implemented yet - you have to refer to each file with their respective device/inode number duets, e.g. syntax: '2/1')
 - Device drivers are running as separate tasks (threads), including pipe device
 - Unified device driver interface
 - shell access via USARTs, multiple sessions can be spawned upon init.
-- The currently implemented OS entity is UNIX-like, with familiar system calls 
 
 
 Repository
