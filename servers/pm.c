@@ -1,6 +1,6 @@
 #include "../kernel/kernel.h"
 #include "../lib/queue.h"
-#include "es.h"
+#include "ex.h"
 #include "vfs.h"
 #include "pm.h"
 
@@ -402,7 +402,7 @@ do_exec (pmmsg_t* msg) {
     int(*ptr)(char**);
     size_t stacksize;
 
-    es_getprg(msg->exec.ask.name, &ptr, &stacksize);
+    ex_getprg(msg->exec.ask.name, &ptr, &stacksize);
     if (!ptr) {
         return 1;  /* Error, send reply */
     }
@@ -437,7 +437,7 @@ do_spawnexec (pmmsg_t* msg) {
     if (!vfs_createtask(task, PM_PIDOF(PM_CLIENT))) {
         return;   /* Sorry... */
     }
-    es_getprg(msg->exec.ask.name, &ptr, &stacksize);
+    ex_getprg(msg->exec.ask.name, &ptr, &stacksize);
     if (!ptr) {
         return;  /* Error, send reply */
     }

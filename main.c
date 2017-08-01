@@ -3,7 +3,7 @@
 #include "servers/vfs.h"
 #include "servers/ts.h"
 #include "servers/pm.h"
-#include "servers/es.h"
+#include "servers/ex.h"
 
 #include "drivers/drv.h"
 
@@ -43,25 +43,25 @@ startup (void* args UNUSED) {
     /* starting executable store server */
     pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);
     allocatestack(pid, DEFAULT_STACK_SIZE);
-    setuptask(pid, es, NULL, NULL);
+    setuptask(pid, ex, NULL, NULL);
     starttask(pid);
-    setespid(pid);
+    setexpid(pid);
 
     /* registering user programs */
-    es_regprg("getty",      getty,          DEFAULT_STACK_SIZE);
-    es_regprg("login",      login,          DEFAULT_STACK_SIZE);
-    es_regprg("sh",         sh,             DEFAULT_STACK_SIZE+64);
-    es_regprg("echo",       echo,           DEFAULT_STACK_SIZE);
-    es_regprg("cat",        cat,            DEFAULT_STACK_SIZE);
-    es_regprg("cap",        cap,            DEFAULT_STACK_SIZE);
-    es_regprg("sleep",      sleep,          DEFAULT_STACK_SIZE);
-    es_regprg("xargs",      xargs,          DEFAULT_STACK_SIZE);
-    es_regprg("repeat",     repeat,         DEFAULT_STACK_SIZE);
-    es_regprg("uptime",     pr_uptime,      DEFAULT_STACK_SIZE);
-    es_regprg("stat",       f_stat,         DEFAULT_STACK_SIZE);
-    es_regprg("mknod",      f_mknod,        DEFAULT_STACK_SIZE);
-    es_regprg("grep",       grep,           DEFAULT_STACK_SIZE);
-    es_regprg("init",       init,           DEFAULT_STACK_SIZE);
+    ex_regprg("getty",      getty,          DEFAULT_STACK_SIZE);
+    ex_regprg("login",      login,          DEFAULT_STACK_SIZE);
+    ex_regprg("sh",         sh,             DEFAULT_STACK_SIZE+64);
+    ex_regprg("echo",       echo,           DEFAULT_STACK_SIZE);
+    ex_regprg("cat",        cat,            DEFAULT_STACK_SIZE);
+    ex_regprg("cap",        cap,            DEFAULT_STACK_SIZE);
+    ex_regprg("sleep",      sleep,          DEFAULT_STACK_SIZE);
+    ex_regprg("xargs",      xargs,          DEFAULT_STACK_SIZE);
+    ex_regprg("repeat",     repeat,         DEFAULT_STACK_SIZE);
+    ex_regprg("uptime",     pr_uptime,      DEFAULT_STACK_SIZE);
+    ex_regprg("stat",       f_stat,         DEFAULT_STACK_SIZE);
+    ex_regprg("mknod",      f_mknod,        DEFAULT_STACK_SIZE);
+    ex_regprg("grep",       grep,           DEFAULT_STACK_SIZE);
+    ex_regprg("init",       init,           DEFAULT_STACK_SIZE);
 
     /* starting process manager server */
     initc = (char**)kmalloc(sizeof(char*[2])); /* Freed in PM */

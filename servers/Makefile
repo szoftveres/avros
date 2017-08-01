@@ -18,7 +18,7 @@ CFLAGS += -Wall -gdwarf-2 -std=gnu99 -Wextra  -Werror -O0 -fsigned-char -funsign
 # CFLAGS += -MD -MP -MT $(*F).o -MF dep/$(@F).d
 
 ## Objects that must be built in order to link
-OBJECTS = $(OBJDIR)/es.o        \
+OBJECTS = $(OBJDIR)/ex.o        \
           $(OBJDIR)/pm.o        \
           $(OBJDIR)/ts.o        \
           $(OBJDIR)/vfs.o       \

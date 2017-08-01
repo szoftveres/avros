@@ -43,7 +43,7 @@ LINKONLYOBJECTS = kernel/kernel.o           \
                   kernel/hal.o              \
                   drivers/drv.o             \
                   lib/queue.o               \
-                  servers/es.o              \
+                  servers/ex.o              \
                   servers/pm.o              \
                   servers/ts.o              \
                   servers/vfs.o             \
