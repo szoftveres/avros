@@ -140,8 +140,9 @@ void restore_context (void) {
 
 
 
-#define SET_EVENTCODE_AND_JMP_TO_HANDLER(x)     \
+#define SWITCH_TO_KERNEL(x)                     \
     do {                                        \
+        LOCK();                                 \
         asm("\n\tpush   r24"                    \
             "\n\tpush   r25"::);                \
         eventcode = (x);                        \
@@ -150,17 +151,11 @@ void restore_context (void) {
             "\n\tjmp switchtokernel\n\t"::);    \
     } while(0)
 
-#define JMP_TO_HANDLER()                        \
-    do {                                        \
-        asm("\n\tjmp switchtokernel\n\t"::);    \
-    } while(0)
-
 /**
  * software trap
  */
 void swtrap (void) {
-    LOCK();
-    JMP_TO_HANDLER();
+    SWITCH_TO_KERNEL(EVENT_NONE);
 }
 
 
@@ -169,7 +164,7 @@ void swtrap (void) {
  */
 ISR (TIMER1_OVF_vect) __attribute__ ((signal, naked));
 ISR (TIMER1_OVF_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_TIMER1OVF);
+    SWITCH_TO_KERNEL(EVENT_TIMER1OVF);
 }
 
 /**
@@ -177,7 +172,7 @@ ISR (TIMER1_OVF_vect) { /* GIE cleared automatically */
  */
 ISR (USART0_RX_vect) __attribute__ ((signal, naked));
 ISR (USART0_RX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART0RX);
+    SWITCH_TO_KERNEL(EVENT_USART0RX);
 }
 
 /**
@@ -185,7 +180,7 @@ ISR (USART0_RX_vect) { /* GIE cleared automatically */
  */
 ISR (USART0_TX_vect) __attribute__ ((signal, naked));
 ISR (USART0_TX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART0TX);
+    SWITCH_TO_KERNEL(EVENT_USART0TX);
 }
 
 /**
@@ -193,7 +188,7 @@ ISR (USART0_TX_vect) { /* GIE cleared automatically */
  */
 ISR (USART1_RX_vect) __attribute__ ((signal, naked));
 ISR (USART1_RX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART1RX);
+    SWITCH_TO_KERNEL(EVENT_USART1RX);
 }
 
 /**
@@ -201,7 +196,7 @@ ISR (USART1_RX_vect) { /* GIE cleared automatically */
  */
 ISR (USART1_TX_vect) __attribute__ ((signal, naked));
 ISR (USART1_TX_vect) { /* GIE cleared automatically */
-    SET_EVENTCODE_AND_JMP_TO_HANDLER(EVENT_USART1TX);
+    SWITCH_TO_KERNEL(EVENT_USART1TX);
 }
 
 /*
