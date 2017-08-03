@@ -128,18 +128,16 @@ newtask (void) {
 
 /*
  * idle task
+ * This task runs 99.9% of the time, so it shoud really not do anything
  */
-
 static void
 idle_task (void* args UNUSED) {
     while (1) {
+        /* Let's save on the electricity bill */
         cpu_sleep();
     }
 }
 
-/*
- * push a byte on the stack of the task and set its SP accordingly
- */
 
 static void
 do_pushstack (task_t* task, char val) {
@@ -292,6 +290,7 @@ scheduler (void) {
             break;
         }
     }
+    /* CURRENT must be set by here */
     return;
 }
 
@@ -360,7 +359,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
         /* handle kernel call*/
         switch (GET_KCALLCODE(ctxt)) {
 
-          case KCALL_CREATETASK:  /* Add a new task entry in the blocked queue */
+          case KCALL_CREATETASK:
             wtask = (pid_t) Q_FRONT(&blocked_q, newtask());
             if (wtask) {
                 wtask->prio = (unsigned char)GETP0(ctxt);
@@ -384,8 +383,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
           case KCALL_STARTTASK:      /* Start a task */
             wtask = (pid_t)GETP0(ctxt);
              /* put new task at the end of rdy queue */
-            Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
-            //Q_FRONT(&queue[old->prio], Q_REMV(&current_q, CURRENT));
+            Q_END(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             break;
 
           case KCALL_STOPTASK:       /* Delete the stack of a blocked task */
@@ -435,7 +433,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
                 /* cannot deliver, block sending task */
                 Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
             } else {
-                Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
+                Q_END(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             }
             break;
 
@@ -444,7 +442,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             if (wtask) {
                 /* msg delivered, put CURRENT in RCV state */
                 SET_KCALLCODE(ctxt, KCALL_RECEIVE);
-                Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
+                Q_END(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
             }
             Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
             break;
@@ -459,7 +457,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
                     /* msg received, put sender in RCV state */
                     SET_KCALLCODE(GET_CTXT(wtask), KCALL_RECEIVE);
                 } else {
-                    Q_FRONT(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
+                    Q_END(&queue[wtask->prio], Q_REMV(&blocked_q, wtask));
                 }
             }
             break;
