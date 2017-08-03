@@ -66,7 +66,7 @@ Repository
     * sema: simple semaphore server (currently unused) - p(), v()
     * ts: time server - timer interrupt handler, 
         sleep(), uptime, real time
-    * es: executables server - 
+    * ex: executables server - 
         registers runnable applications and provides them to pm when a
         task calls exec() (AVR is a Harvard architecture CPU, the OS cannot
         load the binary and burn it into the flash program memory)
