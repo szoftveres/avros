@@ -13,7 +13,7 @@ void* do_malloc (mempage_t *page, size_t len) {
             continue; /* free but too small  */
         }
         if (len + sizeof(chunk_t) + sizeof(chunk_t) >= it->size) {
-            /* free and just perfect size, reserve it! */
+            /* free and just perfect in size, reserve it! */
             it->free = 0;
             return ((char*)it + sizeof(chunk_t));
         }
@@ -35,6 +35,19 @@ void* do_malloc (mempage_t *page, size_t len) {
 
 
 void do_free (mempage_t* page, void *p) {
+    chunk_t *ch;
+    chunk_t *it;
+
+    ch = (char*)p - sizeof(chunk_t);
+    ch->free = 1;
+
+    for (it = page->heap_start; it; it = it->next) {
+        while (it->free && it->next && it->next->free) {
+            /* merge with next free */
+            it->size += it->next->size;
+            it->next = it->next->next;
+        }
+    }
 }
 
 
