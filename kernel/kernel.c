@@ -412,7 +412,7 @@ kernel (void(*ptp)(void* args), void* args, size_t stack, unsigned char prio) {
             break;
 
           case KCALL_WAITEVENT:      /* Block task until an event occurs */
-            Q_FRONT(&blocked_q, Q_REMV(&current_q, CURRENT));
+            Q_END(&blocked_q, Q_REMV(&current_q, CURRENT));
             break;
 
           case KCALL_MALLOC:         /* Allocate memory */
