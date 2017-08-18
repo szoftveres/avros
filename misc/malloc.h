@@ -14,7 +14,7 @@ typedef struct chunk_s {
 
 void* do_malloc (chunk_t* it, size_t len);
 void do_free (chunk_t* it, void *p);
-void init_mempage (chunk_t* it, size_t heap_size);
+void chunklist_init (chunk_t* it, size_t heap_size);
 
 
 #endif

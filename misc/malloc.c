@@ -1,6 +1,8 @@
 #include "malloc.h"
 
-#define PAGE_DIST(x) ((char*)x->next - (char*)x)
+/*
+ * Simple greedy malloc/free implementation
+ */
 
 void* do_malloc (chunk_t* it, size_t len) {
     chunk_t *ch;
@@ -41,8 +43,10 @@ void do_free (chunk_t *it, void *p) {
     if (!p) {
         return;
     }
+    /* mark chunk as free */
     ((chunk_t*)((char*)p - sizeof(chunk_t)))->free = 1;
 
+    /* merge free chunks */
     for (; it; it = it->next) {
         while (it->free && it->next && it->next->free) {
             /* merge with next free */
@@ -55,7 +59,7 @@ void do_free (chunk_t *it, void *p) {
 
 
 
-void init_mempage (chunk_t *it, size_t heap_size) {
+void chunklist_init (chunk_t *it, size_t heap_size) {
     it->free = 1;
     it->size = heap_size;
     it->next = NULL;

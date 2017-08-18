@@ -34,7 +34,7 @@ int main (int argc, char** argv) {
     int i;
 
     memset(mem, 0, sizeof(mem));
-    init_mempage((chunk_t*)mem, sizeof(mem));
+    chunklist_init((chunk_t*)mem, sizeof(mem));
 
     info((chunk_t*)mem);
 
