@@ -42,7 +42,7 @@ newsema (unsigned int val) {
 }
 
 /*
- * 
+ *
  */
 
 static unsigned int
@@ -59,7 +59,7 @@ decreasesema (sema_t* s) {
 }
 
 /*
- * 
+ *
  */
 
 static void
@@ -86,7 +86,7 @@ addclient (sema_t* s, pid_t pid) {
     }
     cli->pid = pid;
     Q_END(&(s->client_q), cli);
-    return (cli); 
+    return (cli);
 }
 
 /*
@@ -191,8 +191,8 @@ semasrv (void* args UNUSED) {
             }
             kfree((void*)Q_REMV(&sema_q, msg.sema));
             break;
-            
-          case SEMA_WAIT:                
+
+          case SEMA_WAIT:
             if (decreasesema(msg.sema)) {
                 break; /* Ok, enter */
             }
@@ -231,7 +231,7 @@ static pid_t    sematask;
 pid_t
 setsemapid (pid_t pid) {
     sematask = pid;
-    return (sematask); 
+    return (sematask);
 }
 
 /*

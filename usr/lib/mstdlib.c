@@ -20,7 +20,7 @@ void
 mfputc (int fd, int data) {
     if (writec(fd, data) == EOF) {
         mexit(0); /* Behaves like SIGPIPE */
-    } 
+    }
     return;
 }
 
@@ -49,7 +49,7 @@ mfputx (int fd, unsigned int num) {
    return;
 }
 
- 
+
 void mfprintf (int fd, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);

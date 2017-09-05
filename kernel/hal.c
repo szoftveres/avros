@@ -11,7 +11,7 @@ extern int eventcode;
 
 /**
  * CPU context Save
- */ 
+ */
 void save_context (void) {
     asm volatile (
         "push r24                       \n\t"  /* Save r24, cycle counter */
@@ -23,11 +23,11 @@ void save_context (void) {
         "push r28                       \n\t"  /* Save Y pair, Destination address */
         "push r29                       \n\t"
         "push r30                       \n\t"  /* Save Z pair, Source address */
-        "push r31                       \n\t"  
+        "push r31                       \n\t"
         "in r28, 0x3d                   \n\t"  /* Store SP in Y */
-        "in r29, 0x3e                   \n\t"  
+        "in r29, 0x3e                   \n\t"
         "in r30, 0x3d                   \n\t"  /* Store SP in Z */
-        "in r31, 0x3e                   \n\t"     
+        "in r31, 0x3e                   \n\t"
         "ldd r26, Y+11                  \n\t"  /* Save return address from stack */
         "ldd r27, Y+10                  \n\t"
         "ldi r24,9                      \n\t"  /* Load 9 in cycle counter */
@@ -65,7 +65,7 @@ void save_context (void) {
         "push r20                       \n\t"
         "push r21                       \n\t"
         "push r22                       \n\t"
-        "push r23                       \n\t"  
+        "push r23                       \n\t"
         "push r26                       \n\t"  /* Push return address on stack */
         "push r27                       \n\t"
         "ret                            \n\t"  /* Return */
@@ -77,7 +77,7 @@ void save_context (void) {
  * CPU context Restore
  */
 void restore_context (void) {
-    asm volatile ( 
+    asm volatile (
         "pop r27                        \n\t"  /* Save return address */
         "pop r26                        \n\t"
         "pop r23                        \n\t"  /* Pop the whole context */
@@ -128,7 +128,7 @@ void restore_context (void) {
         "pop r28                        \n\t"
         "pop r27                        \n\t"
         "pop r26                        \n\t"
-        "pop r25                        \n\t"  
+        "pop r25                        \n\t"
         "pop r24                        \n\t"
         "out __SREG__,r24               \n\t"
         "pop r24                        \n\t"

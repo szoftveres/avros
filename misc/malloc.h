@@ -6,9 +6,9 @@
 
 
 typedef struct chunk_s {
+    struct chunk_s  *next;
     size_t          size;
     char            free;
-    struct chunk_s  *next;
 } chunk_t;
 
 

@@ -4,7 +4,7 @@
 #include "../lib/queue.h"
 #include "../lib/mstddef.h"
 
-enum {   
+enum {
     /* Answer types */
     VFS_HOLD,   /* Driver unblocks VFS but the user task remains blocked */
     VFS_REPEAT, /* Driver indicates that more than one user tasks may be unblocked */
@@ -132,7 +132,7 @@ typedef struct interrupt_s {
 typedef struct mknod_s {
     union {
         int                 dev;      /* dev in devtab */
-        int                 ino;        /* ino number */ 
+        int                 ino;        /* ino number */
     };
     char*               name;       /* name */
 } mknod_t;

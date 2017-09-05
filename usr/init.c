@@ -34,7 +34,7 @@ init (char** argv UNUSED) {
 
     session_t session[] = {
             {"getty", "1/0", NULL},
-    };    
+    };
 
     while (1) {
         for (i = 0; i<(sizeof(session)/sizeof(session[0])); i++) {

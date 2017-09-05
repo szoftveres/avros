@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include "queue.h"
 
-/*    
+/*
  *    QUEUE - General purpose queue (doubly liked list) implementation
  *    2012 Marton Kun-Szabo
  */
@@ -19,7 +19,7 @@ q_init (q_head_t *que) {
     return;
 }
 
-/** 
+/**
  * q_front - put an item to the front of the queue
  *   param1[in]: pointer to the queue
  *   param2[in]: pointer to the item
@@ -41,7 +41,7 @@ q_front (q_head_t *que, q_item_t* item) {
     return (item);
 }
 
-/** 
+/**
  * q_end - put an item to the end of the queue
  *   param1[in]: pointer to the queue
  *   param2[in]: pointer to the item
@@ -63,7 +63,7 @@ q_end (q_head_t *que, q_item_t* item) {
     return (item);
 }
 
-/** 
+/**
  * q_remv - remove an item from the queue
  *   param1[in]: pointer to the queue
  *   param2[in]: pointer to the item
@@ -79,15 +79,15 @@ q_remv (q_head_t *que, q_item_t* item) {
     return (item);
 }
 
-/** 
+/**
  * q_forall - iterate through the queue starting from the front to the end
- *     If callback function returns with a pointer to an item, iteration 
+ *     If callback function returns with a pointer to an item, iteration
  *     stops and function returns with this pointer
  *   param1[in]: pointer to the queue
  *   param2[in]: pointer to the callback function
- *   return:     NULL, or pointer to an item if callback function returns 
+ *   return:     NULL, or pointer to an item if callback function returns
  *               with non-NULL
- *   Note:       callback function is allowed to removed the current item 
+ *   Note:       callback function is allowed to removed the current item
  *               from the queue, this operation is safe
  */
 q_item_t*

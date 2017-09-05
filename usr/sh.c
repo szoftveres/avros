@@ -59,7 +59,7 @@ parse_args (char* t,
                 *stout = t;
             }
             state = CMD_LETTER;
-            break;            
+            break;
         }
         t++;
     }
@@ -77,7 +77,7 @@ exec_job (char** argv) {
     char* stout = NULL;
     char** args = pmmalloc(sizeof(char*) * (MAX_ARGS + 1));
     ASSERT(args);
-    /* 
+    /*
      * This is mandatory because shell keeps the other
      * end of the pipe and this process inherits it
      */
@@ -87,7 +87,7 @@ exec_job (char** argv) {
 
     cmd = pmmalloc(MAX_JOBLEN);
     ASSERT(cmd);
-    receive(TASK_ANY, cmd, MAX_JOBLEN);  
+    receive(TASK_ANY, cmd, MAX_JOBLEN);
 
     parse_args(cmd, &stin, &stout, args);
 
@@ -137,7 +137,7 @@ builtin (char* cmd) {
     ASSERT(args);
     strcpy(line, cmd);
     parse_args(line, NULL, NULL, args);
-    
+
     if (!strcmp(args[0], "exit")) {
         rc = 1;
         mexit(args[1]?atoi(args[1]):0);

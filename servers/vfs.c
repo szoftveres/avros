@@ -539,7 +539,7 @@ vfs (void* args UNUSED) {
 
           case VFS_READC:
           case VFS_WRITEC:
-            msg.client = client;    /* May be delayed, save client */ 
+            msg.client = client;    /* May be delayed, save client */
             do_rw(vfs_client, &msg);
             break;
         }

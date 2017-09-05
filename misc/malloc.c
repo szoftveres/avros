@@ -35,6 +35,7 @@ void* do_malloc (chunk_t* it, size_t len) {
         it->free = 0;
         return ((char*)it + sizeof(chunk_t));
     }
+    /* No more free memory */
     return (NULL);
 }
 
@@ -58,10 +59,10 @@ void do_free (chunk_t *it, void *p) {
 }
 
 
-
 void chunklist_init (chunk_t *it, size_t heap_size) {
     it->free = 1;
     it->size = heap_size;
     it->next = NULL;
 }
+
 
