@@ -16,10 +16,12 @@
 #define MAX_ARGS    8
 
 
-#define CMD_WSPACE  1
-#define CMD_LETTER  2
-#define SIN         3
-#define SOUT        4
+typedef enum parse_state_e {
+    PARSE_NONE,
+    PARSE_LETTER,
+    PARSE_SIN,
+    PARSE_SOUT,
+} parse_state_t;
 
 
 static void
@@ -27,8 +29,9 @@ parse_args (char* t,
             char** stin,
             char** stout,
             char** args) {
-    int i;
-    int state = CMD_WSPACE;
+
+    int             i;
+    parse_state_t   state = PARSE_NONE;
 
     for (i = 0; i < (MAX_ARGS + 1); i++) {
         args[i] = NULL;
@@ -37,13 +40,13 @@ parse_args (char* t,
     i=0;
     while (*t) {
         switch (*t) {
-          case '<': state = SIN; *t='\0'; break; /* no more args */
-          case '>': state = SOUT; *t='\0'; break; /* no more args */
+          case '<': state = PARSE_SIN; *t='\0'; break; /* no more args */
+          case '>': state = PARSE_SOUT; *t='\0'; break; /* no more args */
           case ' ':
           case '\t':
-            if(args[i] && state == CMD_LETTER){
+            if(args[i] && state == PARSE_LETTER){
                 i++;
-                state = CMD_WSPACE;
+                state = PARSE_NONE;
             }
             /* fallthrough */
           case '\n':
@@ -51,14 +54,14 @@ parse_args (char* t,
             *t='\0';
             break;
           default:
-            if (state == CMD_WSPACE) {
+            if (state == PARSE_NONE) {
                 args[i] = t;
-            } else if ((state == SIN) && stin) {
+            } else if ((state == PARSE_SIN) && stin) {
                 *stin = t;
-            } else if ((state == SOUT) && stout) {
+            } else if ((state == PARSE_SOUT) && stout) {
                 *stout = t;
             }
-            state = CMD_LETTER;
+            state = PARSE_LETTER;
             break;
         }
         t++;
