@@ -256,6 +256,7 @@ int
 repeat (char** argv) {
     int n;
     int i;
+    int rc;
     if (argc(argv) < 3) {
         noargs(argv);
         return (-1);
@@ -263,7 +264,10 @@ repeat (char** argv) {
     n = atoi(argv[1]);
     for (i = 0; i != n; i++) {
         spawntask(do_repeat, DEFAULT_STACK_SIZE, argv);
-        wait(NULL);
+        wait(&rc);
+        if (rc) {
+            break;
+        }
     }
     return (0);
 }
@@ -340,11 +344,11 @@ dogrep (char* regexp, int opt) {
     char* line;
     int c = 0, pos, rc = 1;
     while (c != EOF) {
-        line = pmmalloc(64);
+        line = pmmalloc(128);
         pos = 0;
         while ((c = mgetc()) != EOF) {
             line[pos] = c;
-            if (c == '\n') {
+            if (c == '\n' || c == '\r') {
                 line[pos] = '\0';
                 break;
             }

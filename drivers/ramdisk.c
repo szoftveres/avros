@@ -30,25 +30,30 @@ typedef struct mfnode_s {
         char        file[MF_MAX_ENTRIES * sizeof(direntry_t)];
         direntry_t  entry[MF_MAX_ENTRIES];
     };
-    int     size;
+    union {
+        int     size;
+        int     entries;
+    };
 } mfnode_t;
 
 
-int mf_create_node (mfnode_t** nodes) {
+int mf_create_node (mfnode_t** nodes, char flags) {
     int ino;
+    int i;
     for (ino = 0; ino != MF_MAX_NODES; ino++) {
-        if (nodes[ino]) {
-            continue;
+        if (!nodes[ino]) {
+            nodes[ino] = (mfnode_t*) kmalloc(sizeof(mfnode_t));
+            memset (nodes[ino], 0, sizeof(mfnode_t));
+            nodes[ino]->flags = flags;
+            if (nodes[ino]->flags & MF_DIR) {
+                for (i = 0; i != MF_MAX_ENTRIES; i++) {
+                    nodes[ino]->entry[i].ino = -1;
+                }
+            }
+            return ino;
         }
     }
-    if (ino == MF_MAX_NODES) {
-        return -1;
-    }
-    nodes[ino] = (mfnode_t*) kmalloc(sizeof(mfnode_t));
-    nodes[ino]->size = 0;
-    nodes[ino]->refcnt = 0;
-    nodes[ino]->links = 0;
-    return ino;
+    return -1;
 }
 
 int mf_link (mfnode_t* dirnode, char* name, int ino) {
@@ -56,6 +61,7 @@ int mf_link (mfnode_t* dirnode, char* name, int ino) {
     for (i = 0; i != MF_MAX_ENTRIES; i++) {
         if (dirnode->entry[i].ino == -1) {
             dirnode->entry[i].ino = ino;
+            dirnode->entries++;
             strncpy(dirnode->entry[i].name, name, 6);
             return i;
         }
@@ -66,23 +72,21 @@ int mf_link (mfnode_t* dirnode, char* name, int ino) {
 void memfile (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
-    int i;
+    int ino;
     mfnode_t** nodes = (mfnode_t**)kmalloc(sizeof(mfnode_t*) * MF_MAX_NODES);
     memset(nodes, 0, (sizeof(mfnode_t*) * MF_MAX_NODES));
 
     kirqdis();
 
-    mf_create_node(nodes);  /* root dir */
-    nodes[msg.link.ino]->flags |= MF_DIR;
-    for (i = 0; i != MF_MAX_ENTRIES; i++) {
-        nodes[msg.link.ino]->entry[i].ino = -1;
-    }
+    ino = mf_create_node(nodes, MF_DIR);  /* root dir */
+    mf_link(nodes[ino], ".", ino);
+    nodes[ino]->links += 1;
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         switch(msg.cmd){
           case VFS_MKNOD:
-            msg.mknod.ino = mf_create_node(nodes);
+            msg.mknod.ino = mf_create_node(nodes, 0);
             break;
 
           case VFS_LINK:

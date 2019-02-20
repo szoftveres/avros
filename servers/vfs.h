@@ -164,7 +164,9 @@ typedef struct iget_s {
 } iget_t;
 
 typedef struct link_s {
-        int     ino;
+    int         dev;
+    int         ino;
+    char*       name;
 } link_t;
 
 /*

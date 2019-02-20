@@ -160,15 +160,19 @@ static void
 do_mknod (vfsmsg_t *msg) {
     int dev;
     int ino;
+    char *n;
 
     dev = msg->mknod.dev;
+    n = msg->mknod.name;
     /* Create node on device */
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
     ino = msg->mknod.ino;
 
     /* Link the node */
     msg->cmd = VFS_LINK;
+    msg->link.name = n;
     msg->link.ino = ino;
+    msg->link.dev = dev;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
     if (msg->link.ino < 0) {
         msg->mknod.ino = -1;
