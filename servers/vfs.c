@@ -33,6 +33,10 @@ typedef struct vfs_task_s {
     QUEUE_HEADER
     pid_t               pid;
     int                 fd[MAX_FD];
+    int                 wdev;   /* working dir */
+    int                 wino;
+    int                 rdev;   /* root dir */
+    int                 rino;
 } vfs_task_t;
 
 static q_head_t         vfs_task_q;
@@ -468,6 +472,10 @@ vfs_addnewtask (vfsmsg_t *msg) {
         msg->adddel.pid = NULL;
         return;
     }
+    pt->rdev = parent->rdev;
+    pt->rino = parent->rino;
+    pt->wdev = parent->wdev;
+    pt->wino = parent->wino;
     for (i = 0; i != MAX_FD; i++) {
         if (parent->fd[i] >= 0) {
             pt->fd[i] = parent->fd[i];

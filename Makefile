@@ -41,7 +41,9 @@ OBJECTS = $(OBJDIR)/main.o
 
 LINKONLYOBJECTS = kernel/kernel.o           \
                   kernel/hal.o              \
-                  drivers/drv.o             \
+                  drivers/tty.o             \
+                  drivers/pipe.o            \
+                  drivers/ramdisk.o         \
                   lib/queue.o               \
                   servers/ex.o              \
                   servers/pm.o              \

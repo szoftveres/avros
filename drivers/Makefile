@@ -18,7 +18,9 @@ CFLAGS += -Wall -gdwarf-2 -std=gnu99 -Wextra  -Werror -O0 -fsigned-char -funsign
 # CFLAGS += -MD -MP -MT $(*F).o -MF dep/$(@F).d
 
 ## Objects that must be built in order to link
-OBJECTS = $(OBJDIR)/drv.o
+OBJECTS = $(OBJDIR)/tty.o           \
+          $(OBJDIR)/pipe.o          \
+          $(OBJDIR)/ramdisk.o       \
 
 
 ## Build both compiler and program
