@@ -76,7 +76,7 @@ int mf_get_direntry (mfnode_t* dirnode, char* name) {
             continue;
         }
         if (!strcmp(dirnode->entry[i].name, name)) {
-            return i;
+            return dirnode->entry[i].ino;
         }
     }
     return -1;

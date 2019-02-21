@@ -155,6 +155,7 @@ vfs_get_direntry (int *dev, int ino, char* name, int nlen) {
 
     msg.cmd = VFS_GET_DIRENTRY;
     msg.link.ino = ino;
+    msg.link.dev = *dev;
 
     n = kmalloc(nlen + 1);
     if (!n) {
@@ -214,7 +215,7 @@ vfs_get_node (vfs_task_t *client, int *dev, char* path) {
             bn = path + 1;
         }
     }
-    if (len) {
+    if (len > 0) {
         ino = vfs_get_direntry(dev, ino, bn, len);
     }
     return ino;
