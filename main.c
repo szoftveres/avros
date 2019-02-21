@@ -36,9 +36,9 @@ startup (void* args UNUSED) {
     setvfspid(pid);
 
     /* setting up devices and special files */
-    mkdev(pipedev, NULL);
-    mknod(mkdev(tty_usart0, NULL), "ty0");
-    mkdev(memfile, NULL);
+    /* pipe: 0 */
+    mkdev(memfile, NULL); /* 1 */
+    mkdev(tty_usart0, NULL); /* 2 */
 
     /* starting executable store server */
     pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);

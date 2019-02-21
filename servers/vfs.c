@@ -2,6 +2,7 @@
 #include "../lib/queue.h"
 #include "../lib/mstddef.h"
 #include "vfs.h"
+#include "../drivers/drv.h"
 
 /*
  * DEVTAB
@@ -9,7 +10,7 @@
 
 #define MAX_DEV         (6) /* u1, u2, null, pipe, eeprom, ramdisk */
 static pid_t            devtab[MAX_DEV];
-
+int                     pipedev_idx;
 
 /*
  *  FILP
@@ -41,16 +42,6 @@ typedef struct vfs_task_s {
 
 static q_head_t         vfs_task_q;
 
-/*
- *
- */
-
-static void
-vfs_init (void) {
-    memset(filp, 0, (sizeof(filp)));
-    memset(devtab, 0, (sizeof(devtab)));
-    q_init(&vfs_task_q);
-}
 
 /*
  *
@@ -129,28 +120,106 @@ do_dup (vfs_task_t *client, vfsmsg_t *msg) {
  *
  */
 
+static pid_t
+setup_dev (vfsmsg_t *msg) {
+    pid_t pid;
+    pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);
+    allocatestack(pid, DEFAULT_STACK_SIZE);
+    setuptask(pid, msg->mkdev.ask.driver, msg->mkdev.ask.args, NULL);
+    starttask(pid);
+    return pid;
+}
+
 static void
 do_mkdev (vfsmsg_t *msg) {
     int i;
-    pid_t pid;
 
     i = find_empty_devtab();
     if (i < 0) {
         msg->mkdev.ans.id = -1;
         return;
     }
-    pid = createtask(TASK_PRIO_HIGH, PAGE_INVALID);
-    allocatestack(pid, DEFAULT_STACK_SIZE);
-    setuptask(pid, msg->mkdev.ask.driver, msg->mkdev.ask.args, NULL);
-    starttask(pid);
-
-    devtab[i] = pid;
-
-    msg->cmd = VFS_MKDEV;
-    sendrec(pid, msg, sizeof(vfsmsg_t));
+    devtab[i] = setup_dev(msg);
     msg->mkdev.ans.id = i;
     return;
 }
+
+/*
+ *   name = "abcd"    nlen == 4
+ */
+int
+vfs_get_direntry (int *dev, int ino, char* name, int nlen) {
+    vfsmsg_t msg;
+    int i;
+    char* n;
+
+    msg.cmd = VFS_GET_DIRENTRY;
+    msg.link.ino = ino;
+
+    n = kmalloc(nlen + 1);
+    if (!n) {
+        return (-1);
+    }
+    for (i = 0; i != nlen; i++) {
+        n[i] = name[i];
+    }
+    n[i] = '\0';
+    msg.link.name = n;
+    sendrec(devtab[*dev], &msg, sizeof(msg));
+    kfree(n);
+    *dev = msg.link.dev;
+    return (msg.link.ino);
+}
+
+int
+vfs_get_dir (vfs_task_t *client, int *dev, char* path) {
+    int ino;
+
+    if (!path || !path[0]) {
+        return -1;
+    } else if (path[0] == '/') {
+        *dev = client->rdev;
+        ino = client->rino;
+        path += 1;
+    } else {
+        *dev = client->wdev;
+        ino = client->wino;
+    }
+    while (ino >= 0) {
+        int len;
+
+        for (len = 0; (path[len] != '/') && (path[len] != '\0'); len++);
+        if (path[len] == '\0') {
+            break;
+        }
+        ino = vfs_get_direntry(dev, ino, path, len);
+        path += (len + 1);
+    }
+    return (ino);
+}
+
+int
+vfs_get_node (vfs_task_t *client, int *dev, char* path) {
+    int ino;
+    char *bn;
+    int len;
+
+    ino = vfs_get_dir(client, dev, path);
+    if (ino < 0) {
+        return -1;
+    }
+    for (len = 0, bn = path; *path; len++, path++) {
+        if (*path == '/') {
+            len = -1;
+            bn = path + 1;
+        }
+    }
+    if (len) {
+        ino = vfs_get_direntry(dev, ino, bn, len);
+    }
+    return ino;
+}
+
 
 /*
  *
@@ -187,9 +256,14 @@ do_mknod (vfsmsg_t *msg) {
  */
 
 static void
-do_stat (vfsmsg_t *msg) {
+do_stat (vfs_task_t *client, vfsmsg_t *msg) {
+    int dev;
+    int ino;
 
-    msg->stat.ans.st_stat.ino = msg->stat.ans.st_stat.ino;
+    ino = vfs_get_node(client, &dev, msg->stat.ask.name);
+    msg->stat.ans.code = (ino < 0 ? -1 : 0);
+    msg->stat.ans.st_stat.dev = dev;
+    msg->stat.ans.st_stat.ino = ino;
     return;
 }
 
@@ -202,14 +276,10 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     int fd;
     int fp;
     int ino;
-    int dev;
-
-    /* Assumption: device 0 is PIPE */
-    dev = 0;
 
     /* Create inode on device */
     msg->cmd = VFS_MKNOD;
-    sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
+    sendrec(devtab[pipedev_idx], msg, sizeof(vfsmsg_t));
     if (msg->mknod.ino < 0) {
         msg->pipe.result = -1;
         return; /* Cannot create node */
@@ -219,7 +289,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
     /* Get this new node  2x */
     msg->cmd = VFS_INODE_GRAB;
     msg->iget.ino = ino;
-    sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
+    sendrec(devtab[pipedev_idx], msg, sizeof(vfsmsg_t));
 
     if (msg->iget.ino < 0) {
         msg->pipe.result = -1;
@@ -228,7 +298,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
 
     msg->cmd = VFS_INODE_GRAB;
     msg->iget.ino = ino;
-    sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
+    sendrec(devtab[pipedev_idx], msg, sizeof(vfsmsg_t));
 
     if (msg->iget.ino < 0) {
         msg->pipe.result = -1;
@@ -246,7 +316,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
         msg->pipe.result = -1;
         return;
     }
-    filp[fp].dev = dev;
+    filp[fp].dev = pipedev_idx;
     filp[fp].ino = ino;
     filp[fp].refcnt++;
     client->fd[fd] = fp;
@@ -263,7 +333,7 @@ do_pipe (vfs_task_t *client, vfsmsg_t *msg) {
         msg->pipe.result = -1;
         return;
     }
-    filp[fp].dev = dev;
+    filp[fp].dev = pipedev_idx;
     filp[fp].ino = ino;
     filp[fp].refcnt++;
     client->fd[fd] = fp;
@@ -467,6 +537,10 @@ vfs_addnewtask (vfsmsg_t *msg) {
         pt->fd[i] = (-1);
     }
     if (!msg->adddel.parent) {
+        pt->rdev = 1;   /* XXX hack until better idea comes */
+        pt->rino = 0;
+        pt->wdev = 1;
+        pt->wino = 0;
         return;  /* no parent, we're done */
     }
     parent = vfs_findbypid(msg->adddel.parent);
@@ -493,6 +567,26 @@ vfs_addnewtask (vfsmsg_t *msg) {
  *
  */
 
+static void
+vfs_init (vfsmsg_t *msg) {
+    memset(filp, 0, (sizeof(filp)));
+    memset(devtab, 0, (sizeof(devtab)));
+    q_init(&vfs_task_q);
+
+    /* set up pipe device */
+    msg->cmd = VFS_MKDEV;
+    msg->mkdev.ask.driver = pipedev;
+    msg->mkdev.ask.args = NULL;
+    do_mkdev(msg);
+    pipedev_idx = msg->mkdev.ans.id;
+
+    return;
+}
+
+/*
+ *
+ */
+
 void
 vfs (void* args UNUSED) {
     pid_t client;
@@ -500,7 +594,7 @@ vfs (void* args UNUSED) {
     vfsmsg_t msg;
 
     kirqdis();
-    vfs_init();
+    vfs_init(&msg);
 
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
@@ -532,7 +626,7 @@ vfs (void* args UNUSED) {
             break;
 
           case VFS_STAT:
-            do_stat(&msg);
+            do_stat(vfs_client, &msg);
             break;
 
           case VFS_OPEN:
@@ -543,8 +637,8 @@ vfs (void* args UNUSED) {
             do_close(vfs_client, &msg);
             break;
 
-          case VFS_RX_INTERRUPT:
-          case VFS_TX_INTERRUPT:
+          case VFS_RD_INTERRUPT:
+          case VFS_WR_INTERRUPT:
             do_int(&msg);
             client = msg.client;
             break;
@@ -577,6 +671,22 @@ pid_t
 setvfspid (pid_t pid) {
     vfstask = pid;
     return (vfstask);
+}
+
+void
+vfs_rd_interrupt (pid_t driver) {
+    vfsmsg_t msg;
+    msg.client = driver;
+    msg.cmd = VFS_RD_INTERRUPT;
+    send(vfstask, &msg);
+}
+
+void
+vfs_wr_interrupt (pid_t driver) {
+    vfsmsg_t msg;
+    msg.client = driver;
+    msg.cmd = VFS_WR_INTERRUPT;
+    send(vfstask, &msg);
 }
 
 /*
@@ -733,3 +843,4 @@ dup (int fd) {
     sendrec(vfstask, &msg, sizeof(msg));
     return (msg.dup.fd);
 }
+

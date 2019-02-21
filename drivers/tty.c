@@ -9,19 +9,19 @@
 
 
 void usart0_event (void* args UNUSED) {
-    vfsmsg_t    msg;
-    pid_t       manager;
     pid_t       driver;
 
-    driver = receive(TASK_ANY, &msg, sizeof(msg));
-    manager = msg.client;
+    {
+        vfsmsg_t    msg;
+        driver = receive(TASK_ANY, &msg, sizeof(msg));
 
-    UBRR0H = 0;    /* 9600 BAUD */
-    UBRR0L = 103;  /* 9600 BAUD */
-    UCSR0C = (1<<USBS0)|(3<<UCSZ00);
-    UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+        UBRR0H = 0;    /* 9600 BAUD */
+        UBRR0L = 103;  /* 9600 BAUD */
+        UCSR0C = (1<<USBS0)|(3<<UCSZ00);
+        UCSR0B = (1<<RXEN0)|(1<<TXEN0);
 
-    send(driver, &msg);
+        send(driver, &msg);
+    }
 
     kirqdis();
 
@@ -32,22 +32,20 @@ void usart0_event (void* args UNUSED) {
         UDR0 = (unsigned char) '\n';
 //    }
 
-    msg.client = driver;
     while (1) {
         UCSR0B |= (1<<RXCIE0); /* Re-Enable RXC interrupt */
         UCSR0B |= (1<<TXCIE0); /* Re-Enable TXC interrupt */
         switch (waitevent(EVENT_USART0RX | EVENT_USART0TX)) {
           case EVENT_USART0RX:
             UCSR0B &= ~(1<<RXCIE0); /* Disable RXC interrupt */
-            msg.cmd = VFS_RX_INTERRUPT;
+            vfs_rd_interrupt(driver);
             break;
           case EVENT_USART0TX:
             UCSR0B &= ~(1<<TXCIE0); /* Disable TXC interrupt */
             /* Executing the interrupt handler clears TXC flag automatically */
-            msg.cmd = VFS_TX_INTERRUPT;
+            vfs_wr_interrupt(driver);
             break;
         }
-        send(manager, &msg);
     }
 }
 
@@ -58,7 +56,7 @@ usart0_serve_write(q_head_t* wr_q, vfsmsg_t *msg, int cmd_to_be_served) {
     container = (vfsmsg_container_t*)(Q_FIRST(*wr_q));
     if (container && container->msg.cmd == cmd_to_be_served) {
         /* Request can be served, reply */
-        char i = (msg->cmd == VFS_TX_INTERRUPT);
+        char i = (msg->cmd == VFS_WR_INTERRUPT);
         UDR0 = (unsigned char) (i ? container->msg : *msg).rw.data;
         msg->client = (i ? container->msg : *msg).client;
         kfree(Q_REMV(wr_q, container));
@@ -80,7 +78,7 @@ usart0_print_char (q_head_t* wr_q, int c) {
     msg.cmd = VFS_WRITEC;
     msg.client = NULL;
     msg.rw.data = c;
-    usart0_serve_write(wr_q, &msg, VFS_TX_INTERRUPT);
+    usart0_serve_write(wr_q, &msg, VFS_WR_INTERRUPT);
 /*
     msg.cmd = VFS_REPEAT;
     sendrec(client, &msg, sizeof(vfsmsg_t));
@@ -98,7 +96,7 @@ usart_serve_read(q_head_t* rd_q, vfsmsg_t *msg, int cmd_to_be_served) {
     container = (vfsmsg_container_t*)(Q_FIRST(*rd_q));
     if (container && container->msg.cmd == cmd_to_be_served) {
         /* Request can be served, reply */
-        char i = (msg->cmd == VFS_RX_INTERRUPT);
+        char i = (msg->cmd == VFS_RD_INTERRUPT);
         msg->client = (i ? container->msg : *msg).client;
         msg->rw.data = (i ? *msg : container->msg).interrupt.data;
         kfree(Q_REMV(rd_q, container));
@@ -118,7 +116,7 @@ void
 usart_reply_char (pid_t client, q_head_t* rd_q, int c) {
     vfsmsg_t msg;
 
-    msg.cmd = VFS_RX_INTERRUPT;
+    msg.cmd = VFS_RD_INTERRUPT;
     msg.client = NULL;
     msg.interrupt.data = c;
     usart_serve_read(rd_q, &msg, VFS_READC);
@@ -155,37 +153,25 @@ void tty_usart0 (void* args UNUSED) {
     tbuf = kmalloc(128);
     idx = 0;
 
+    /* Setting up interrupt handler */
+    client = createtask(TASK_PRIO_RT, PAGE_INVALID);
+    allocatestack(client, DEFAULT_STACK_SIZE-64);
+    setuptask(client, usart0_event, NULL, NULL);
+    starttask(client);
+    sendrec(client, &msg, sizeof(msg));
+
+
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
 
         switch (msg.cmd) {
-
-          case VFS_MKDEV: {
-                pid_t       task;
-                task = createtask(TASK_PRIO_RT, PAGE_INVALID);
-                allocatestack(task, DEFAULT_STACK_SIZE-64);
-                setuptask(task, usart0_event, NULL, NULL);
-                starttask(task);
-                msg.client = client;
-                sendrec(task, &msg, sizeof(msg));
-            }
-            break;
-
-          case VFS_INODE_GRAB:
-            break;
-          case VFS_INODE_RELEASE:
-            break;
-          case VFS_LINK:
-            break;
-          case VFS_UNLINK:
-            break;
           case VFS_READC:
-            usart_serve_read(&rd_q, &msg, VFS_RX_INTERRUPT);
+            usart_serve_read(&rd_q, &msg, VFS_RD_INTERRUPT);
             break;
           case VFS_WRITEC:
-            usart0_serve_write(&wr_q, &msg, VFS_TX_INTERRUPT);
+            usart0_serve_write(&wr_q, &msg, VFS_WR_INTERRUPT);
             break;
-          case VFS_RX_INTERRUPT:
+          case VFS_RD_INTERRUPT:
             msg.interrupt.data = UDR0;  /* Clear RX interrupt flag */
             if (!ttymode) {
                 usart_serve_read(&rd_q, &msg, VFS_READC);
@@ -224,7 +210,7 @@ void tty_usart0 (void* args UNUSED) {
                 msg.cmd = VFS_HOLD;
             }
             break;
-          case VFS_TX_INTERRUPT:
+          case VFS_WR_INTERRUPT:
             usart0_serve_write(&wr_q, &msg, VFS_WRITEC);
             break;
         }

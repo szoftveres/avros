@@ -16,10 +16,10 @@
 #define MF_DIR      0x01
 
 
-typedef struct direntry_s {
+typedef struct mf_direntry_s {
     char    name[6];
     int     ino;
-} direntry_t;
+} mf_direntry_t;
 
 
 typedef struct mfnode_s {
@@ -27,8 +27,8 @@ typedef struct mfnode_s {
     char    links;
     char    flags;
     union {
-        char        file[MF_MAX_ENTRIES * sizeof(direntry_t)];
-        direntry_t  entry[MF_MAX_ENTRIES];
+        char            file[MF_MAX_ENTRIES * sizeof(mf_direntry_t)];
+        mf_direntry_t   entry[MF_MAX_ENTRIES];
     };
     union {
         int     size;
@@ -69,6 +69,19 @@ int mf_link (mfnode_t* dirnode, char* name, int ino) {
     return -1;
 }
 
+int mf_get_direntry (mfnode_t* dirnode, char* name) {
+    int i;
+    for (i = 0; i != MF_MAX_ENTRIES; i++) {
+        if (dirnode->entry[i].ino == -1) {
+            continue;
+        }
+        if (!strcmp(dirnode->entry[i].name, name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void memfile (void* args UNUSED) {
     pid_t client;
     vfsmsg_t msg;
@@ -96,6 +109,7 @@ void memfile (void* args UNUSED) {
             }
             nodes[msg.link.ino]->links += 1;
             break;
+
           case VFS_UNLINK:
             if (!nodes[msg.link.ino]) {
                 msg.link.ino = -1;
@@ -118,6 +132,7 @@ void memfile (void* args UNUSED) {
             }
             nodes[msg.iget.ino]->refcnt += 1;
             break;
+
           case VFS_INODE_RELEASE:
             if (!nodes[msg.iget.ino]) {
                 msg.iget.ino = -1;
@@ -144,6 +159,7 @@ void memfile (void* args UNUSED) {
                 nodes[msg.rw.ino]->size += msg.rw.bnum;
             }
             break;
+
           case VFS_READC:
             if ((msg.rw.pos >= 127) ||
                 (msg.rw.pos >= nodes[msg.rw.ino]->size)) {
@@ -152,6 +168,14 @@ void memfile (void* args UNUSED) {
             } else {
                 msg.rw.data = nodes[msg.rw.ino]->file[msg.rw.pos];
                 msg.rw.bnum = 1;
+            }
+            break;
+
+          case VFS_GET_DIRENTRY:
+            if (nodes[msg.link.ino]->flags & MF_DIR) {
+                msg.link.ino = mf_get_direntry(nodes[msg.link.ino], msg.link.name);
+            } else {
+                msg.link.ino = -1; /* Not a directory */
             }
             break;
         }

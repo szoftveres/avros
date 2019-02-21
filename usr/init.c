@@ -33,7 +33,7 @@ init (char** argv UNUSED) {
     pid_t pid;
 
     session_t session[] = {
-            {"getty", "1/0", NULL},
+            {"getty", "2/0", NULL},
     };
 
     while (1) {

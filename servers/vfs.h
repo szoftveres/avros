@@ -11,8 +11,8 @@ enum {
     VFS_FINAL,  /* End of transaction, unblocking VFS and/or user task */
 
     /* Query types */
-    VFS_RX_INTERRUPT,
-    VFS_TX_INTERRUPT,
+    VFS_RD_INTERRUPT,
+    VFS_WR_INTERRUPT,
 
     VFS_INODE_GRAB,
     VFS_INODE_RELEASE,
@@ -21,6 +21,10 @@ enum {
 
     VFS_MKNOD,
     VFS_MKDEV,
+
+
+    VFS_GET_DIRENTRY,
+
 
     VFS_STAT,
     VFS_DUP,
@@ -137,6 +141,7 @@ typedef struct mknod_s {
     char*               name;       /* name */
 } mknod_t;
 
+
 /*
  * PIPE
  */
@@ -202,6 +207,9 @@ typedef struct vfsmsg_container_s {
  */
 
 void vfs (void* args);
+
+void vfs_rd_interrupt (pid_t driver);
+void vfs_wr_interrupt (pid_t driver);
 
 pid_t setvfspid (pid_t pid);
 
