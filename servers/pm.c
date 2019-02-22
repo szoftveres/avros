@@ -430,11 +430,11 @@ do_spawnexec (pmmsg_t* msg) {
     if (!task) {
         return;   /* Sorry... */
     }
-    pm_task = pm_newtask(task, PM_CLIENT);
-    if (!Q_END(&task_q, pm_task)) {
+    if (!vfs_createtask(task, PM_PIDOF(PM_CLIENT))) {
         return;   /* Sorry... */
     }
-    if (!vfs_createtask(task, PM_PIDOF(PM_CLIENT))) {
+    pm_task = pm_newtask(task, PM_CLIENT);
+    if (!Q_END(&task_q, pm_task)) {
         return;   /* Sorry... */
     }
     ex_getprg(msg->exec.ask.name, &ptr, &stacksize);

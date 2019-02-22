@@ -484,13 +484,11 @@ do_int (vfsmsg_t *msg) {
  * =============
  */
 
-#define VFS_PIDOF(p) ((p) ? ((p)->pid) : (NULL))
-
 static vfs_task_t*
 vfs_findbypid (pid_t pid) {
     vfs_task_t *it = (vfs_task_t*)Q_FIRST(vfs_task_q);
     while (it) {
-        if (VFS_PIDOF(it) == pid) {
+        if (it->pid == pid) {
             break;
         }
         it = (vfs_task_t*)Q_NEXT(it);

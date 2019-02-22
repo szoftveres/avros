@@ -437,7 +437,7 @@ int fs_debug (char** argv) {
     int c, opt = 0;
     getopt_p opt_p = initgetopt();
 
-    while ((c = getopt(argv, "s", opt_p)) != EOF) {
+    while ((c = getopt(argv, "r", opt_p)) != EOF) {
         switch (c) {
           case 'r': opt = 1; break;
           case '?': pmfree(opt_p); mexit(1); break;
