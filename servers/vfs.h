@@ -24,6 +24,7 @@ enum {
 
 
     VFS_GET_DIRENTRY,
+    VFS_DEBUG,
 
 
     VFS_STAT,
@@ -225,5 +226,7 @@ int fstat (char *name, struct stat *st_stat);
 void close (int fd);
 int readc (int fd);
 int writec (int fd, int c);
+
+int vfs_debugn (int reset);
 
 #endif

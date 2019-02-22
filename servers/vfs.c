@@ -11,6 +11,7 @@
 #define MAX_DEV         (6) /* u1, u2, null, pipe, eeprom, ramdisk */
 static pid_t            devtab[MAX_DEV];
 int                     pipedev_idx;
+static int              debugn;
 
 /*
  *  FILP
@@ -597,6 +598,7 @@ vfs (void* args UNUSED) {
     kirqdis();
     vfs_init(&msg);
 
+    debugn = 0;
     while (1) {
         client = receive(TASK_ANY, &msg, sizeof(msg));
         vfs_client = vfs_findbypid(client);
@@ -648,6 +650,13 @@ vfs (void* args UNUSED) {
           case VFS_WRITEC:
             msg.client = client;    /* May be delayed, save client */
             do_rw(vfs_client, &msg);
+            break;
+
+          case VFS_DEBUG:
+            if (msg.interrupt.data) {
+                debugn = 0;
+            }
+            msg.interrupt.data = debugn;
             break;
         }
 
@@ -844,4 +853,14 @@ dup (int fd) {
     sendrec(vfstask, &msg, sizeof(msg));
     return (msg.dup.fd);
 }
+
+int
+vfs_debugn (int reset) {
+    vfsmsg_t msg;
+    msg.cmd = VFS_DEBUG;
+    msg.interrupt.data = reset;
+    sendrec(vfstask, &msg, sizeof(msg));
+    return (msg.interrupt.data);
+}
+
 

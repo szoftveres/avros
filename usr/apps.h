@@ -23,4 +23,6 @@ int grep (char** argv);
 
 int repeat (char** argv);
 
+int fs_debug (char** argv);
+
 #endif

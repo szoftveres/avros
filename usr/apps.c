@@ -429,3 +429,30 @@ f_mknod (char** argv) {
     return (0);
 }
 
+/*
+ * -r : reset
+ */
+
+int fs_debug (char** argv) {
+    int c, opt = 0;
+    getopt_p opt_p = initgetopt();
+
+    while ((c = getopt(argv, "s", opt_p)) != EOF) {
+        switch (c) {
+          case 'r': opt = 1; break;
+          case '?': pmfree(opt_p); mexit(1); break;
+        }
+    }
+    pmfree(opt_p);
+
+    c = vfs_debugn(0);
+    mfprintf(1, " vfs debugn:%d", c);
+    if (opt) {
+        vfs_debugn(1);
+        c = vfs_debugn(0);
+        mfprintf(1, " -> %d", c);
+    }
+    mfprintf(1, "\n");
+    return (0);
+}
+

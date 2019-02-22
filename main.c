@@ -61,6 +61,7 @@ startup (void* args UNUSED) {
     ex_regprg("stat",       f_stat,         DEFAULT_STACK_SIZE);
     ex_regprg("mknod",      f_mknod,        DEFAULT_STACK_SIZE);
     ex_regprg("grep",       grep,           DEFAULT_STACK_SIZE);
+    ex_regprg("fs_debug",   fs_debug,       DEFAULT_STACK_SIZE);
     ex_regprg("init",       init,           DEFAULT_STACK_SIZE);
 
     /* starting process manager server */
