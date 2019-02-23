@@ -170,7 +170,7 @@ typedef struct iget_s {
 } iget_t;
 
 typedef struct link_s {
-    int         dev;
+    int         dir_ino;
     int         ino;
     char*       name;
 } link_t;

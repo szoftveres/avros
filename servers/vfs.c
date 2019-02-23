@@ -156,7 +156,6 @@ vfs_get_direntry (int *dev, int ino, char* name, int nlen) {
 
     msg.cmd = VFS_GET_DIRENTRY;
     msg.link.ino = ino;
-    msg.link.dev = *dev;
 
     n = kmalloc(nlen + 1);
     if (!n) {
@@ -169,7 +168,6 @@ vfs_get_direntry (int *dev, int ino, char* name, int nlen) {
     msg.link.name = n;
     sendrec(devtab[*dev], &msg, sizeof(msg));
     kfree(n);
-    *dev = msg.link.dev;
     return (msg.link.ino);
 }
 
@@ -200,6 +198,18 @@ vfs_get_dir (vfs_task_t *client, int *dev, char* path) {
     return (ino);
 }
 
+char*
+basename (char* path, int *len) {
+    char *bn;
+    for (*len = 0, bn = path; *path; (*len) += 1, path++) {
+        if (*path == '/') {
+            *len = -1;
+            bn = path + 1;
+        }
+    }
+    return bn;
+}
+
 int
 vfs_get_node (vfs_task_t *client, int *dev, char* path) {
     int ino;
@@ -210,12 +220,7 @@ vfs_get_node (vfs_task_t *client, int *dev, char* path) {
     if (ino < 0) {
         return -1;
     }
-    for (len = 0, bn = path; *path; len++, path++) {
-        if (*path == '/') {
-            len = -1;
-            bn = path + 1;
-        }
-    }
+    bn = basename(path, &len);
     if (len > 0) {
         ino = vfs_get_direntry(dev, ino, bn, len);
     }
@@ -228,14 +233,21 @@ vfs_get_node (vfs_task_t *client, int *dev, char* path) {
  */
 
 static void
-do_mknod (vfsmsg_t *msg) {
+do_mknod (vfs_task_t *client, vfsmsg_t *msg) {
     int dev;
     int ino;
+    int dir_ino;
     char *n;
 
-    dev = msg->mknod.dev;
     n = msg->mknod.name;
-    /* Create node on device */
+
+    /* Find the directory node */
+    dir_ino = vfs_get_dir(client, &dev, msg->mknod.name);
+    if (dir_ino < 0) {
+        msg->mknod.ino = -1;
+        return;
+    }
+    /* Create new node on device */
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
     ino = msg->mknod.ino;
 
@@ -243,7 +255,7 @@ do_mknod (vfsmsg_t *msg) {
     msg->cmd = VFS_LINK;
     msg->link.name = n;
     msg->link.ino = ino;
-    msg->link.dev = dev;
+    msg->link.dir_ino = dir_ino;
     sendrec(devtab[dev], msg, sizeof(vfsmsg_t));
     if (msg->link.ino < 0) {
         msg->mknod.ino = -1;
@@ -615,7 +627,7 @@ vfs (void* args UNUSED) {
             break;
 
           case VFS_MKNOD:
-            do_mknod(&msg);
+            do_mknod(vfs_client, &msg);
             break;
 
           case VFS_DUP:
